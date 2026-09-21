@@ -1,5 +1,7 @@
 # AI File Organizer
 
+[![Build](https://github.com/NikhilChowdaryBonthu/AIFileOrganizer/actions/workflows/build.yml/badge.svg)](https://github.com/NikhilChowdaryBonthu/AIFileOrganizer/actions/workflows/build.yml)
+
 AI File Organizer is a local Mac desktop assistant for reviewing and organizing personal files. It runs on .NET and uses Ollama with `qwen3:4b` on the same Mac for document classification. Files are not uploaded to a cloud AI service.
 
 The app is designed for review first: it scans files, shows a suggested destination for every item, and waits for the user to choose which files to move.
@@ -85,6 +87,7 @@ This creates `dist/AI File Organizer.app`. It includes the .NET runtime, so VS C
 
 - [Architecture](docs/architecture.md)
 - [Changelog](CHANGELOG.md)
+- [Demo guide](docs/demo-guide.md)
 
 ## Current status
 
