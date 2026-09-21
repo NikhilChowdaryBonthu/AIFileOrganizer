@@ -30,6 +30,7 @@
             <ComboBoxItem Content="100 files" />
           </ComboBox>
           <Button x:Name="ScanButton" Content="Start safe scan" Click="StartScan_Click" HorizontalAlignment="Left" Padding="20,10" />
+          <Button x:Name="WatcherButton" Content="Start Downloads watcher" Click="ToggleWatcher_Click" HorizontalAlignment="Left" Padding="20,10" />
         </StackPanel>
       </Border>
 
@@ -48,7 +49,7 @@
     </Grid>
 
     <Border Grid.Row="2" Background="#20242B" CornerRadius="10" Padding="14">
-      <TextBlock x:Name="ActivityText" Text="Ready. No files have been moved." Opacity="0.8" />
+      <TextBlock x:Name="ActivityText" Text="Ready. No files have been moved." TextWrapping="Wrap" Opacity="0.8" />
     </Border>
   </Grid>
 </Window>

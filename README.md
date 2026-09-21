@@ -46,4 +46,4 @@ The application data is stored under `~/Documents/AIFileOrganizer/Database`. Loc
 
 ## Current status
 
-Version 1 is a working console-based organizer. Future work may add a desktop interface, saved user preferences, and optional background monitoring for new files.
+Version 2 adds a Mac desktop interface. It supports safe scans, per-file review checkboxes, an explicit confirmation before organizing, desktop Undo, and an optional Downloads watcher that suggests classifications for new files while the app is open. The watcher never moves files automatically.

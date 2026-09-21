@@ -23,6 +23,30 @@ class Program
         string[] foldersToScan,
         int scanLimit)
     {
+        return await ScanFromDesktopAsync(
+            foldersToScan,
+            scanLimit,
+            null);
+    }
+
+    internal static async Task<List<MovePlan>> ClassifyDownloadedFileAsync(
+        string filePath)
+    {
+        string? folder = Path.GetDirectoryName(filePath);
+        if (string.IsNullOrWhiteSpace(folder))
+            return new List<MovePlan>();
+
+        return await ScanFromDesktopAsync(
+            new[] { folder },
+            1,
+            new[] { filePath });
+    }
+
+    private static async Task<List<MovePlan>> ScanFromDesktopAsync(
+        string[] foldersToScan,
+        int scanLimit,
+        IEnumerable<string>? specificFiles)
+    {
         string homePath = Environment.GetFolderPath(
             Environment.SpecialFolder.UserProfile);
 
@@ -52,7 +76,8 @@ class Program
             duplicateReviewPath,
             supportedExtensions,
             ollama,
-            scanLimit);
+            scanLimit,
+            specificFiles);
     }
 
     internal static OrganizationResult OrganizeFromDesktop(
@@ -516,7 +541,8 @@ class Program
     string duplicateReviewPath,
     HashSet<string> supportedExtensions,
     OllamaApiClient ollama,
-    int scanLimit)
+    int scanLimit,
+    IEnumerable<string>? specificFiles = null)
     {
         List<string> files =
             new();
@@ -530,53 +556,39 @@ class Program
         );
         Console.WriteLine();
 
-        foreach (string folder in foldersToScan)
+        IEnumerable<string> candidateFiles = specificFiles ?? foldersToScan
+            .Where(Directory.Exists)
+            .SelectMany(SafeGetFiles);
+
+        foreach (string file in candidateFiles)
         {
-            if (!Directory.Exists(folder))
+            string extension = Path.GetExtension(file);
+
+            if (!supportedExtensions.Contains(extension))
             {
                 continue;
             }
 
-            Console.WriteLine(
-                $"Scanning: {folder}"
-            );
-
-            foreach (string file in SafeGetFiles(folder))
+            if (ShouldSkipFile(
+                file,
+                organizedPath,
+                projectPath,
+                duplicateReviewPath))
             {
-                string extension =
-                    Path.GetExtension(file);
-
-                if (!supportedExtensions.Contains(extension))
-                {
-                    continue;
-                }
-
-                if (ShouldSkipFile(
-                    file,
-                    organizedPath,
-                    projectPath,
-                    duplicateReviewPath))
-                {
-                    continue;
-                }
-
-                if (!CanMoveFromFolder(file, out string sourceFolder))
-                {
-                    if (warnedReadOnlyFolders.Add(sourceFolder))
-                    {
-                        Console.WriteLine(
-                            $"Skipping read-only folder: {sourceFolder}"
-                        );
-                        Console.WriteLine(
-                            "Grant your account write access before organizing files from this folder."
-                        );
-                    }
-
-                    continue;
-                }
-
-                files.Add(file);
+                continue;
             }
+
+            if (!CanMoveFromFolder(file, out string sourceFolder))
+            {
+                if (warnedReadOnlyFolders.Add(sourceFolder))
+                {
+                    Console.WriteLine($"Skipping read-only folder: {sourceFolder}");
+                }
+
+                continue;
+            }
+
+            files.Add(file);
         }
 
         files = files

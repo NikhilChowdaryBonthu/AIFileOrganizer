@@ -1,12 +1,15 @@
 using System.Net.Http;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
+using Avalonia.Threading;
 
 namespace AIFileOrganizer.Desktop.Views;
 
 public partial class MainWindow : Window
 {
     private List<MovePlan> _movePlans = new();
+    private readonly List<CheckBox> _reviewItems = new();
+    private FileSystemWatcher? _downloadsWatcher;
 
     public MainWindow()
     {
@@ -71,13 +74,9 @@ public partial class MainWindow : Window
                 () => Program.ScanFromDesktopAsync(folders.ToArray(), scanLimit));
 
             _movePlans = plans;
-
-            ResultsList.ItemsSource = plans.Select(plan => new CheckBox
-            {
-                Content = $"{Path.GetFileName(plan.Source)}  →  {plan.Category} / {plan.Subcategory}",
-                IsChecked = true,
-                Tag = plan
-            }).ToList();
+            _reviewItems.Clear();
+            _reviewItems.AddRange(plans.Select(CreateReviewItem));
+            ResultsList.ItemsSource = _reviewItems;
 
             ScanSummaryText.Text = plans.Count == 0
                 ? "No supported files were found in the selected folders."
@@ -94,6 +93,83 @@ public partial class MainWindow : Window
         finally
         {
             ScanButton.IsEnabled = true;
+        }
+    }
+
+    private CheckBox CreateReviewItem(MovePlan plan) => new()
+    {
+        Content = $"{Path.GetFileName(plan.Source)}  →  {plan.Category} / {plan.Subcategory}",
+        IsChecked = true,
+        Tag = plan
+    };
+
+    private void ToggleWatcher_Click(object? sender, RoutedEventArgs e)
+    {
+        if (_downloadsWatcher is not null)
+        {
+            _downloadsWatcher.Dispose();
+            _downloadsWatcher = null;
+            WatcherButton.Content = "Start Downloads watcher";
+            ActivityText.Text = "Downloads watcher stopped. No files have been moved.";
+            return;
+        }
+
+        string downloadsPath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+            "Downloads");
+        _downloadsWatcher = new FileSystemWatcher(downloadsPath)
+        {
+            IncludeSubdirectories = false,
+            EnableRaisingEvents = true
+        };
+        _downloadsWatcher.Created += DownloadDetected;
+        _downloadsWatcher.Renamed += DownloadRenamed;
+        WatcherButton.Content = "Stop Downloads watcher";
+        ActivityText.Text = "Downloads watcher is active. New supported files will be added for review; nothing moves automatically.";
+    }
+
+    private void DownloadRenamed(object sender, RenamedEventArgs e) => _ = ReviewNewDownloadAsync(e.FullPath);
+
+    private void DownloadDetected(object sender, FileSystemEventArgs e) => _ = ReviewNewDownloadAsync(e.FullPath);
+
+    private async Task ReviewNewDownloadAsync(string filePath)
+    {
+        await Task.Delay(TimeSpan.FromSeconds(2));
+
+        if (!File.Exists(filePath))
+            return;
+
+        try
+        {
+            List<MovePlan> plans = await Task.Run(
+                () => Program.ClassifyDownloadedFileAsync(filePath));
+
+            if (plans.Count == 0)
+                return;
+
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                foreach (MovePlan plan in plans)
+                {
+                    if (_movePlans.Any(item => string.Equals(item.Source, plan.Source, StringComparison.OrdinalIgnoreCase)))
+                        continue;
+
+                    _movePlans.Add(plan);
+                    _reviewItems.Add(CreateReviewItem(plan));
+                }
+
+                ResultsList.ItemsSource = null;
+                ResultsList.ItemsSource = _reviewItems;
+                MoveConfirmationCheckBox.IsEnabled = _movePlans.Count > 0;
+                OrganizeButton.IsEnabled = _movePlans.Count > 0;
+                ScanSummaryText.Text = $"New download ready for review: {Path.GetFileName(filePath)}.";
+                ActivityText.Text = "The Downloads watcher added a suggestion. No file has been moved.";
+            });
+        }
+        catch
+        {
+            await Dispatcher.UIThread.InvokeAsync(() =>
+                ActivityText.Text = $"Could not classify new download: {Path.GetFileName(filePath)}.");
         }
     }
 
@@ -129,7 +205,9 @@ public partial class MainWindow : Window
         ActivityText.Text = "Every completed move is stored in local history and can be undone from the console app.";
         MoveConfirmationCheckBox.IsEnabled = false;
         ResultsList.ItemsSource = null;
+        _reviewItems.Clear();
         _movePlans.Clear();
+        _reviewItems.Clear();
         ScanButton.IsEnabled = true;
     }
 
