@@ -197,6 +197,36 @@ class Program
         return OrganizeFromDesktop(customPlans);
     }
 
+    internal static List<List<MovePlan>> FindExactDuplicates(
+        IEnumerable<MovePlan> movePlans)
+    {
+        Dictionary<string, List<MovePlan>> groups = new();
+        foreach (MovePlan plan in movePlans.Where(plan => File.Exists(plan.Source)))
+        {
+            string hash = CalculateFileHash(plan.Source);
+            if (!groups.TryGetValue(hash, out List<MovePlan>? items))
+            {
+                items = new List<MovePlan>();
+                groups[hash] = items;
+            }
+            items.Add(plan);
+        }
+        return groups.Values.Where(items => items.Count > 1).ToList();
+    }
+
+    internal static int DeleteSelectedFiles(IEnumerable<MovePlan> movePlans)
+    {
+        int deleted = 0;
+        foreach (MovePlan plan in movePlans)
+        {
+            if (!File.Exists(plan.Source))
+                continue;
+            File.Delete(plan.Source);
+            deleted++;
+        }
+        return deleted;
+    }
+
     internal static UndoResult UndoLastOrganizationFromDesktop()
     {
         InitializeDatabase();

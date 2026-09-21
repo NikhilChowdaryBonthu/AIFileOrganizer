@@ -48,12 +48,11 @@ public partial class MainWindow : Window
             return;
         }
 
-        int scanLimit = ScanLimitBox.SelectedIndex switch
+        if (!int.TryParse(ScanLimitTextBox.Text, out int scanLimit) || scanLimit < 1 || scanLimit > 1000)
         {
-            0 => 20,
-            2 => 100,
-            _ => 50
-        };
+            ScanSummaryText.Text = "Enter a whole number from 1 to 1000.";
+            return;
+        }
 
         string homePath = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         List<string> folders = new();
@@ -87,6 +86,9 @@ public partial class MainWindow : Window
             OrganizeButton.IsEnabled = plans.Count > 0;
             CustomFolderButton.IsEnabled = plans.Count > 0;
             SelectedFolderButton.IsEnabled = plans.Count > 0;
+            DuplicateButton.IsEnabled = plans.Count > 1;
+            DeleteButton.IsEnabled = plans.Count > 0;
+            DeleteConfirmationCheckBox.IsEnabled = plans.Count > 0;
             ActivityText.Text = "Scan complete. Untick any file you do not want to organize, then confirm the remaining selection.";
         }
         catch (Exception ex)
@@ -186,6 +188,9 @@ public partial class MainWindow : Window
                 OrganizeButton.IsEnabled = _movePlans.Count > 0;
                 CustomFolderButton.IsEnabled = _movePlans.Count > 0;
                 SelectedFolderButton.IsEnabled = _movePlans.Count > 0;
+                DuplicateButton.IsEnabled = _movePlans.Count > 1;
+                DeleteButton.IsEnabled = _movePlans.Count > 0;
+                DeleteConfirmationCheckBox.IsEnabled = _movePlans.Count > 0;
                 ScanSummaryText.Text = $"New download ready for review: {Path.GetFileName(filePath)}.";
                 ActivityText.Text = "The Downloads watcher added a suggestion. No file has been moved.";
             });
@@ -327,6 +332,46 @@ public partial class MainWindow : Window
         .Select(item => (MovePlan)item.Tag!)
         .ToList()
         ?? new List<MovePlan>();
+
+    private async void FindDuplicates_Click(object? sender, RoutedEventArgs e)
+    {
+        DuplicateButton.IsEnabled = false;
+        ActivityText.Text = "Checking selected files for exact duplicates.";
+        List<MovePlan> selectedPlans = GetApprovedPlans();
+        List<List<MovePlan>> duplicates = await Task.Run(
+            () => Program.FindExactDuplicates(selectedPlans));
+        ScanSummaryText.Text = duplicates.Count == 0
+            ? "No exact duplicate files were found in the selected scan results."
+            : $"Found {duplicates.Count} duplicate group(s): " + string.Join("; ", duplicates.Select(group => string.Join(", ", group.Select(plan => Path.GetFileName(plan.Source)))));
+        ActivityText.Text = "Duplicate check complete. No files were changed.";
+        DuplicateButton.IsEnabled = _movePlans.Count > 1;
+    }
+
+    private async void DeleteSelected_Click(object? sender, RoutedEventArgs e)
+    {
+        if (DeleteConfirmationCheckBox.IsChecked != true)
+        {
+            ActivityText.Text = "Tick the permanent deletion confirmation before deleting files.";
+            return;
+        }
+        List<MovePlan> selectedPlans = GetApprovedPlans();
+        if (selectedPlans.Count == 0)
+        {
+            ActivityText.Text = "Select at least one file to delete.";
+            return;
+        }
+        DeleteButton.IsEnabled = false;
+        ActivityText.Text = $"Permanently deleting {selectedPlans.Count} selected file(s).";
+        int deleted = await Task.Run(() => Program.DeleteSelectedFiles(selectedPlans));
+        _reviewItems.RemoveAll(item => item.IsChecked == true);
+        _movePlans.RemoveAll(plan => selectedPlans.Contains(plan));
+        ResultsList.ItemsSource = null;
+        ResultsList.ItemsSource = _reviewItems;
+        ScanSummaryText.Text = $"Deleted {deleted} file(s).";
+        ActivityText.Text = "Deletion complete.";
+        DeleteConfirmationCheckBox.IsChecked = false;
+        DeleteButton.IsEnabled = _movePlans.Count > 0;
+    }
 
     private void ClearReviewAfterMove()
     {

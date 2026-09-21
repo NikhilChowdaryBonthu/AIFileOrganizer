@@ -24,11 +24,7 @@
           <CheckBox x:Name="DocumentsCheckBox" Content="Documents" IsChecked="True" FontSize="16" />
           <Separator Margin="0,6" />
           <TextBlock Text="Scan limit" FontWeight="SemiBold" />
-          <ComboBox x:Name="ScanLimitBox" SelectedIndex="1" Width="160" HorizontalAlignment="Left">
-            <ComboBoxItem Content="20 files" />
-            <ComboBoxItem Content="50 files" />
-            <ComboBoxItem Content="100 files" />
-          </ComboBox>
+          <TextBox x:Name="ScanLimitTextBox" Text="20" Width="160" HorizontalAlignment="Left" PlaceholderText="Example: 4" />
           <Button x:Name="ScanButton" Content="Start safe scan" Click="StartScan_Click" HorizontalAlignment="Left" Padding="20,10" />
           <Button x:Name="WatcherButton" Content="Start Downloads watcher" Click="ToggleWatcher_Click" HorizontalAlignment="Left" Padding="20,10" />
           <Separator Margin="0,6" />
@@ -39,7 +35,7 @@
       </Border>
 
       <Border Grid.Column="1" Background="#20242B" CornerRadius="12" Padding="22">
-        <Grid RowDefinitions="Auto,Auto,*,Auto,Auto" RowSpacing="12">
+        <Grid RowDefinitions="Auto,Auto,*,Auto,Auto,Auto" RowSpacing="12">
           <TextBlock Text="2. Review suggestions" FontSize="19" FontWeight="SemiBold" />
           <TextBlock Grid.Row="1" x:Name="ScanSummaryText" Text="Choose folders and start a scan. Results will appear here." TextWrapping="Wrap" Opacity="0.75" />
           <ListBox Grid.Row="2" x:Name="ResultsList" BorderThickness="0" />
@@ -49,6 +45,13 @@
             <Button x:Name="CustomFolderButton" Content="Move selected to new folder" Click="MoveToCustomFolder_Click" IsEnabled="False" Padding="20,10" />
             <Button x:Name="SelectedFolderButton" Content="Move selected to chosen folder" Click="MoveToSelectedFolder_Click" IsEnabled="False" Padding="20,10" />
             <Button x:Name="UndoButton" Content="Undo last organization" Click="Undo_Click" Padding="20,10" />
+          </StackPanel>
+          <StackPanel Grid.Row="5" Spacing="6">
+            <StackPanel Orientation="Horizontal" Spacing="10">
+              <Button x:Name="DuplicateButton" Content="Find exact duplicates" Click="FindDuplicates_Click" IsEnabled="False" Padding="12,8" />
+              <Button x:Name="DeleteButton" Content="Delete selected files" Click="DeleteSelected_Click" IsEnabled="False" Padding="12,8" />
+            </StackPanel>
+            <CheckBox x:Name="DeleteConfirmationCheckBox" Content="I understand selected files will be permanently deleted." IsEnabled="False" />
           </StackPanel>
         </Grid>
       </Border>
