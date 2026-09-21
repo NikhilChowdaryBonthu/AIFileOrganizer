@@ -288,6 +288,9 @@ class Program
         List<string> files =
             new();
 
+        HashSet<string> warnedReadOnlyFolders =
+            new(StringComparer.OrdinalIgnoreCase);
+
         Console.WriteLine();
         Console.WriteLine(
             "========== SCANNING LAPTOP =========="
@@ -321,6 +324,21 @@ class Program
                     projectPath,
                     duplicateReviewPath))
                 {
+                    continue;
+                }
+
+                if (!CanMoveFromFolder(file, out string sourceFolder))
+                {
+                    if (warnedReadOnlyFolders.Add(sourceFolder))
+                    {
+                        Console.WriteLine(
+                            $"Skipping read-only folder: {sourceFolder}"
+                        );
+                        Console.WriteLine(
+                            "Grant your account write access before organizing files from this folder."
+                        );
+                    }
+
                     continue;
                 }
 
@@ -1333,12 +1351,13 @@ if (isPersonalDocument)
         string fileName)
     {
         string value =
-            $"{filePath} {fileName}".ToLowerInvariant();
+            NormalizeForMatching($"{filePath} {fileName}");
 
         if (ContainsAny(value,
             "resume", "curriculum vitae", "_cv", " cv.",
             "full stack developer", ".net developer", ".net engineer",
-            "software engineer", "tech lead", "backend developer"))
+            "software engineer", "tech lead", "backend developer",
+            "microsoft dynamics"))
         {
             return new Classification("Career", "Resumes");
         }
@@ -1385,7 +1404,8 @@ if (isPersonalDocument)
         }
 
         if (ContainsAny(value,
-            "course", "session", "assignment", "syllabus"))
+            "course", "session", "assignment", "syllabus", "aws-v",
+            "resource pack"))
         {
             return new Classification("Education", "Course Materials");
         }
@@ -1396,7 +1416,31 @@ if (isPersonalDocument)
     static bool ContainsAny(string value, params string[] keywords)
     {
         return keywords.Any(keyword =>
-            value.Contains(keyword, StringComparison.OrdinalIgnoreCase));
+            value.Contains(
+                NormalizeForMatching(keyword),
+                StringComparison.Ordinal));
+    }
+
+    static string NormalizeForMatching(string value)
+    {
+        StringBuilder normalized = new();
+        bool previousWasSpace = false;
+
+        foreach (char character in value)
+        {
+            if (char.IsLetterOrDigit(character))
+            {
+                normalized.Append(char.ToLowerInvariant(character));
+                previousWasSpace = false;
+            }
+            else if (!previousWasSpace)
+            {
+                normalized.Append(' ');
+                previousWasSpace = true;
+            }
+        }
+
+        return normalized.ToString().Trim();
     }
 
     static bool IsUncategorized(Classification classification)
@@ -1554,6 +1598,32 @@ if (isPersonalDocument)
         return Path.GetFileName(filePath).EndsWith(
             ".csproj.FileListAbsolute.txt",
             StringComparison.OrdinalIgnoreCase);
+    }
+
+    static bool CanMoveFromFolder(
+        string filePath,
+        out string sourceFolder)
+    {
+        sourceFolder = Path.GetDirectoryName(filePath) ?? "Unknown folder";
+
+        if (OperatingSystem.IsWindows())
+        {
+            return true;
+        }
+
+        try
+        {
+            UnixFileMode mode = File.GetUnixFileMode(sourceFolder);
+
+            return (mode &
+                (UnixFileMode.UserWrite |
+                 UnixFileMode.GroupWrite |
+                 UnixFileMode.OtherWrite)) != 0;
+        }
+        catch
+        {
+            return true;
+        }
     }
 
     static bool IsInsideFolder(
