@@ -1,0 +1,17 @@
+# .NET build output
+bin/
+obj/
+
+# Local application data and file-move history
+Database/
+History/
+
+# Local source snapshots
+Program_Backup.txt
+Program_Final_SQLite_Working.txt
+Program_Working_With_SQLite.txt
+Program_Working_With_Undo.txt
+
+# Editor and operating system files
+.vscode/
+.DS_Store
