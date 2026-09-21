@@ -241,6 +241,56 @@ class Program
         return new UndoResult(restored, skipped, true);
     }
 
+    internal static UndoResult UndoAllOrganizationsFromDesktop()
+    {
+        InitializeDatabase();
+        string connectionString = $"Data Source={GetDatabasePath()}";
+        using SqliteConnection connection = new(connectionString);
+        connection.Open();
+
+        using SqliteCommand filesCommand = new(
+            "SELECT Id, SourcePath, DestinationPath FROM FileOperations WHERE IsUndone = 0 ORDER BY Id DESC;",
+            connection);
+        List<(long Id, string Source, string Destination)> files = new();
+        using (SqliteDataReader reader = filesCommand.ExecuteReader())
+        {
+            while (reader.Read())
+                files.Add((reader.GetInt64(0), reader.GetString(1), reader.GetString(2)));
+        }
+
+        int restored = 0;
+        int skipped = 0;
+        foreach ((long id, string source, string destination) in files)
+        {
+            try
+            {
+                if (!File.Exists(destination) || File.Exists(source))
+                {
+                    skipped++;
+                    continue;
+                }
+
+                string? originalFolder = Path.GetDirectoryName(source);
+                if (!string.IsNullOrWhiteSpace(originalFolder))
+                    Directory.CreateDirectory(originalFolder);
+
+                File.Move(destination, source);
+                using SqliteCommand updateCommand = new(
+                    "UPDATE FileOperations SET IsUndone = 1 WHERE Id = $id;",
+                    connection);
+                updateCommand.Parameters.AddWithValue("$id", id);
+                updateCommand.ExecuteNonQuery();
+                restored++;
+            }
+            catch
+            {
+                skipped++;
+            }
+        }
+
+        return new UndoResult(restored, skipped, files.Count > 0);
+    }
+
     static async Task Main()
     {
         string homePath =
