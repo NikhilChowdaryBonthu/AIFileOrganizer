@@ -31,6 +31,16 @@ ollama pull qwen3:4b
 dotnet run
 ```
 
+## Create a Mac app
+
+On an Apple Silicon Mac, create a standalone app bundle with:
+
+```bash
+zsh scripts/package-macos.sh
+```
+
+The app is created at `dist/AI File Organizer.app`. It includes the .NET runtime, so VS Code and the .NET SDK are not needed to open the finished app. Ollama must still be installed and running for local AI classification.
+
 ## Recommended workflow
 
 1. Start with a small scan from one folder, such as Downloads.

@@ -1,6 +1,7 @@
 # .NET build output
 bin/
 obj/
+dist/
 
 # Local application data and file-move history
 Database/
