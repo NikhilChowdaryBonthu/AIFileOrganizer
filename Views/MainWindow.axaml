@@ -34,6 +34,7 @@
           <Separator Margin="0,6" />
           <TextBlock Text="Or create a custom folder in Documents" FontWeight="SemiBold" />
           <TextBox x:Name="CustomFolderNameBox" PlaceholderText="Example: C# Course Files" />
+          <Button x:Name="ChooseFolderButton" Content="Choose an existing destination folder" Click="ChooseFolder_Click" HorizontalAlignment="Left" Padding="12,8" />
         </StackPanel>
       </Border>
 
@@ -46,6 +47,7 @@
           <StackPanel Grid.Row="4" Orientation="Horizontal" Spacing="10">
             <Button x:Name="OrganizeButton" Content="Organize reviewed files" Click="Organize_Click" IsEnabled="False" Padding="20,10" />
             <Button x:Name="CustomFolderButton" Content="Move selected to new folder" Click="MoveToCustomFolder_Click" IsEnabled="False" Padding="20,10" />
+            <Button x:Name="SelectedFolderButton" Content="Move selected to chosen folder" Click="MoveToSelectedFolder_Click" IsEnabled="False" Padding="20,10" />
             <Button x:Name="UndoButton" Content="Undo last organization" Click="Undo_Click" Padding="20,10" />
           </StackPanel>
         </Grid>

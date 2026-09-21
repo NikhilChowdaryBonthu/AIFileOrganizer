@@ -180,6 +180,23 @@ class Program
         return OrganizeFromDesktop(customPlans);
     }
 
+    internal static OrganizationResult MoveToExistingFolder(
+        IEnumerable<MovePlan> movePlans,
+        string destinationFolder)
+    {
+        if (!Directory.Exists(destinationFolder))
+            throw new ArgumentException("Choose an existing destination folder.");
+
+        List<MovePlan> customPlans = movePlans.Select(plan => plan with
+        {
+            Destination = Path.Combine(destinationFolder, Path.GetFileName(plan.Source)),
+            Category = "Custom",
+            Subcategory = Path.GetFileName(destinationFolder)
+        }).ToList();
+
+        return OrganizeFromDesktop(customPlans);
+    }
+
     internal static UndoResult UndoLastOrganizationFromDesktop()
     {
         InitializeDatabase();

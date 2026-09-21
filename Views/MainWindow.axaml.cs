@@ -1,6 +1,7 @@
 using System.Net.Http;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
+using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 
 namespace AIFileOrganizer.Desktop.Views;
@@ -10,6 +11,7 @@ public partial class MainWindow : Window
     private List<MovePlan> _movePlans = new();
     private readonly List<CheckBox> _reviewItems = new();
     private FileSystemWatcher? _downloadsWatcher;
+    private string? _selectedDestinationFolder;
 
     public MainWindow()
     {
@@ -84,6 +86,7 @@ public partial class MainWindow : Window
             MoveConfirmationCheckBox.IsEnabled = plans.Count > 0;
             OrganizeButton.IsEnabled = plans.Count > 0;
             CustomFolderButton.IsEnabled = plans.Count > 0;
+            SelectedFolderButton.IsEnabled = plans.Count > 0;
             ActivityText.Text = "Scan complete. Untick any file you do not want to organize, then confirm the remaining selection.";
         }
         catch (Exception ex)
@@ -182,6 +185,7 @@ public partial class MainWindow : Window
                 MoveConfirmationCheckBox.IsEnabled = _movePlans.Count > 0;
                 OrganizeButton.IsEnabled = _movePlans.Count > 0;
                 CustomFolderButton.IsEnabled = _movePlans.Count > 0;
+                SelectedFolderButton.IsEnabled = _movePlans.Count > 0;
                 ScanSummaryText.Text = $"New download ready for review: {Path.GetFileName(filePath)}.";
                 ActivityText.Text = "The Downloads watcher added a suggestion. No file has been moved.";
             });
@@ -269,6 +273,52 @@ public partial class MainWindow : Window
             CustomFolderButton.IsEnabled = true;
             ScanButton.IsEnabled = true;
         }
+    }
+
+    private async void ChooseFolder_Click(object? sender, RoutedEventArgs e)
+    {
+        IReadOnlyList<IStorageFolder> folders = await StorageProvider.OpenFolderPickerAsync(
+            new FolderPickerOpenOptions { Title = "Choose where selected files should go" });
+        string? path = folders.FirstOrDefault()?.TryGetLocalPath();
+        if (string.IsNullOrWhiteSpace(path))
+            return;
+
+        _selectedDestinationFolder = path;
+        ChooseFolderButton.Content = $"Chosen: {path}";
+        ActivityText.Text = "Destination selected. Scan and review files before moving them.";
+    }
+
+    private async void MoveToSelectedFolder_Click(object? sender, RoutedEventArgs e)
+    {
+        if (MoveConfirmationCheckBox.IsChecked != true)
+        {
+            ActivityText.Text = "Tick the confirmation box after reviewing the selected files.";
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(_selectedDestinationFolder))
+        {
+            ActivityText.Text = "Choose an existing destination folder first.";
+            return;
+        }
+
+        List<MovePlan> approvedPlans = GetApprovedPlans();
+        if (approvedPlans.Count == 0)
+        {
+            ActivityText.Text = "Select at least one file to move.";
+            return;
+        }
+
+        OrganizeButton.IsEnabled = false;
+        CustomFolderButton.IsEnabled = false;
+        SelectedFolderButton.IsEnabled = false;
+        ScanButton.IsEnabled = false;
+        ActivityText.Text = $"Moving {approvedPlans.Count} reviewed file(s) to {_selectedDestinationFolder}.";
+
+        OrganizationResult result = await Task.Run(
+            () => Program.MoveToExistingFolder(approvedPlans, _selectedDestinationFolder));
+        ScanSummaryText.Text = $"Move complete: {result.Moved} moved, {result.Renamed} renamed, {result.Duplicates} duplicate(s), {result.Errors} issue(s).";
+        ActivityText.Text = "The move is saved in local history and can be undone.";
+        ClearReviewAfterMove();
     }
 
     private List<MovePlan> GetApprovedPlans() => ResultsList.ItemsSource
