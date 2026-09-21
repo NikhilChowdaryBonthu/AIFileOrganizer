@@ -52,6 +52,8 @@ The app is created at `dist/AI File Organizer.app`. It includes the .NET runtime
 
 Files are never deleted. The application asks for confirmation before moving files and stores local SQLite history for undo.
 
+Before confirmation, the desktop review list shows the complete destination path for every file. Standard destinations are under `~/Documents/Organized/<Category>/<Subcategory>/`. Exact duplicates are placed in `~/Downloads/Duplicates_Review/` for manual review.
+
 The application data is stored under `~/Documents/AIFileOrganizer/Database`. Local history, build output, and source backups are excluded from Git.
 
 ## Current status

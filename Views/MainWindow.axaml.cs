@@ -96,12 +96,30 @@ public partial class MainWindow : Window
         }
     }
 
-    private CheckBox CreateReviewItem(MovePlan plan) => new()
+    private CheckBox CreateReviewItem(MovePlan plan)
     {
-        Content = $"{Path.GetFileName(plan.Source)}  →  {plan.Category} / {plan.Subcategory}",
-        IsChecked = true,
-        Tag = plan
-    };
+        StackPanel details = new() { Spacing = 2 };
+        details.Children.Add(new TextBlock
+        {
+            Text = $"{Path.GetFileName(plan.Source)}  →  {plan.Category} / {plan.Subcategory}",
+            TextWrapping = Avalonia.Media.TextWrapping.Wrap
+        });
+        details.Children.Add(new TextBlock
+        {
+            Text = $"Destination: {plan.Destination}",
+            FontSize = 11,
+            Opacity = 0.65,
+            TextWrapping = Avalonia.Media.TextWrapping.Wrap
+        });
+
+        return new CheckBox
+        {
+            Content = details,
+            IsChecked = true,
+            Tag = plan,
+            Margin = new Avalonia.Thickness(0, 0, 0, 8)
+        };
+    }
 
     private void ToggleWatcher_Click(object? sender, RoutedEventArgs e)
     {
