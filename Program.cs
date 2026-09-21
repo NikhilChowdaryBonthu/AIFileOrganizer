@@ -367,24 +367,36 @@ class Program
                     extension == ".txt"
                 )
                 {
-                    Classification? cachedClassification =
-                        TryGetCachedClassification(file);
+                    Classification? filenameClassification =
+                        TryClassifyDocumentByFileContext(file, fileName);
 
-                    if (cachedClassification != null)
+                    if (filenameClassification != null)
                     {
-                        classification = cachedClassification;
-                        method = "Saved local result";
+                        classification = filenameClassification;
+                        method = "Filename and folder rule";
                     }
                     else
                     {
-                        classification = await ClassifyDocumentWithAI(
-                            file,
-                            fileName,
-                            ollama
-                        );
+                        Classification? cachedClassification =
+                            TryGetCachedClassification(file);
 
-                        SaveClassificationCache(file, classification);
-                        method = "Local AI";
+                        if (cachedClassification != null &&
+                            !IsUncategorized(cachedClassification))
+                        {
+                            classification = cachedClassification;
+                            method = "Saved local result";
+                        }
+                        else
+                        {
+                            classification = await ClassifyDocumentWithAI(
+                                file,
+                                fileName,
+                                ollama
+                            );
+
+                            SaveClassificationCache(file, classification);
+                            method = "Local AI";
+                        }
                     }
                 }
                 else
@@ -1314,6 +1326,87 @@ if (isPersonalDocument)
         return ClassifyByExtension(
             extension
         );
+    }
+
+    static Classification? TryClassifyDocumentByFileContext(
+        string filePath,
+        string fileName)
+    {
+        string value =
+            $"{filePath} {fileName}".ToLowerInvariant();
+
+        if (ContainsAny(value,
+            "resume", "curriculum vitae", "_cv", " cv.",
+            "full stack developer", ".net developer", ".net engineer",
+            "software engineer", "tech lead", "backend developer"))
+        {
+            return new Classification("Career", "Resumes");
+        }
+
+        if (ContainsAny(value,
+            "interview", "first round", "questions", "assessment",
+            "screening", "recruiter"))
+        {
+            return new Classification("Career", "Interviews");
+        }
+
+        if (ContainsAny(value,
+            "offer letter", "employment agreement", "employment contract",
+            "employee information", "direct deposit", "anti-discrimination",
+            "compliance document", "pre-employment", "consultant"))
+        {
+            return new Classification("Career", "Employment");
+        }
+
+        if (ContainsAny(value,
+            "w4", "w-4", "tax", "1099"))
+        {
+            return new Classification("Finance", "Taxes");
+        }
+
+        if (ContainsAny(value,
+            "paycheck", "pay stub", "bank statement", "statement",
+            "receipt", "invoice", "billing"))
+        {
+            return new Classification("Finance", "Other Finance");
+        }
+
+        if (ContainsAny(value,
+            "passport", "driver license", "drivers license", "driving license",
+            "social security", "ssn", "i9", "i-9", "medical document"))
+        {
+            return new Classification("Personal", "Personal Documents");
+        }
+
+        if (ContainsAny(value,
+            "reservation", "airlines", "flight", "travel", "hotel"))
+        {
+            return new Classification("Personal", "Other Personal");
+        }
+
+        if (ContainsAny(value,
+            "course", "session", "assignment", "syllabus"))
+        {
+            return new Classification("Education", "Course Materials");
+        }
+
+        return null;
+    }
+
+    static bool ContainsAny(string value, params string[] keywords)
+    {
+        return keywords.Any(keyword =>
+            value.Contains(keyword, StringComparison.OrdinalIgnoreCase));
+    }
+
+    static bool IsUncategorized(Classification classification)
+    {
+        return classification.Category.Equals(
+            "Other",
+            StringComparison.OrdinalIgnoreCase) &&
+            classification.Subcategory.Equals(
+                "Uncategorized",
+                StringComparison.OrdinalIgnoreCase);
     }
 
     static Classification
