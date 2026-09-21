@@ -1,0 +1,52 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="AIFileOrganizer.Desktop.Views.MainWindow"
+        Title="AI File Organizer"
+        Width="1024" Height="700" MinWidth="850" MinHeight="560">
+  <Grid RowDefinitions="Auto,*,Auto" Margin="30">
+    <Grid ColumnDefinitions="*,Auto">
+      <StackPanel Spacing="4">
+        <TextBlock Text="AI File Organizer" FontSize="30" FontWeight="SemiBold" />
+        <TextBlock Text="A private, local assistant for reviewing files before they move." Opacity="0.7" FontSize="15" />
+      </StackPanel>
+      <Border Grid.Column="1" Background="#173B2B" CornerRadius="14" Padding="12,7" VerticalAlignment="Center">
+        <TextBlock x:Name="OllamaStatusText" Text="Checking Ollama…" Foreground="#9FE7C0" />
+      </Border>
+    </Grid>
+
+    <Grid Grid.Row="1" ColumnDefinitions="1.05*,1.4*" ColumnSpacing="26" Margin="0,34,0,20">
+      <Border Background="#20242B" CornerRadius="12" Padding="22">
+        <StackPanel Spacing="18">
+          <TextBlock Text="1. Choose folders to review" FontSize="19" FontWeight="SemiBold" />
+          <TextBlock Text="Your files stay where they are until you review and approve a move." TextWrapping="Wrap" Opacity="0.75" />
+          <CheckBox x:Name="DownloadsCheckBox" Content="Downloads" IsChecked="True" FontSize="16" />
+          <CheckBox x:Name="DesktopCheckBox" Content="Desktop" IsChecked="True" FontSize="16" />
+          <CheckBox x:Name="DocumentsCheckBox" Content="Documents" IsChecked="True" FontSize="16" />
+          <Separator Margin="0,6" />
+          <TextBlock Text="Scan limit" FontWeight="SemiBold" />
+          <ComboBox x:Name="ScanLimitBox" SelectedIndex="1" Width="160" HorizontalAlignment="Left">
+            <ComboBoxItem Content="20 files" />
+            <ComboBoxItem Content="50 files" />
+            <ComboBoxItem Content="100 files" />
+          </ComboBox>
+          <Button x:Name="ScanButton" Content="Start safe scan" Click="StartScan_Click" HorizontalAlignment="Left" Padding="20,10" />
+        </StackPanel>
+      </Border>
+
+      <Border Grid.Column="1" Background="#20242B" CornerRadius="12" Padding="22">
+        <Grid RowDefinitions="Auto,Auto,*,Auto" RowSpacing="12">
+          <TextBlock Text="2. Review suggestions" FontSize="19" FontWeight="SemiBold" />
+          <TextBlock Grid.Row="1" x:Name="ScanSummaryText" Text="Choose folders and start a scan. Results will appear here." TextWrapping="Wrap" Opacity="0.75" />
+          <ListBox Grid.Row="2" x:Name="ResultsList" BorderThickness="0" />
+          <Border Grid.Row="3" Background="#2B3038" CornerRadius="8" Padding="12">
+            <TextBlock Text="File moves and undo controls will be connected after the desktop scan is verified." TextWrapping="Wrap" Opacity="0.65" />
+          </Border>
+        </Grid>
+      </Border>
+    </Grid>
+
+    <Border Grid.Row="2" Background="#20242B" CornerRadius="10" Padding="14">
+      <TextBlock x:Name="ActivityText" Text="Ready. No files have been moved." Opacity="0.8" />
+    </Border>
+  </Grid>
+</Window>

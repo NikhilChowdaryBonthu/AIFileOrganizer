@@ -19,6 +19,42 @@ class Program
     private const int MaxDocumentCharacters = 2500;
     private static readonly TimeSpan AiTimeout = TimeSpan.FromSeconds(45);
 
+    internal static async Task<List<MovePlan>> ScanFromDesktopAsync(
+        string[] foldersToScan,
+        int scanLimit)
+    {
+        string homePath = Environment.GetFolderPath(
+            Environment.SpecialFolder.UserProfile);
+
+        string documentsPath = Path.Combine(homePath, "Documents");
+        string downloadsPath = Path.Combine(homePath, "Downloads");
+        string organizedPath = Path.Combine(documentsPath, "Organized");
+        string projectPath = Path.Combine(documentsPath, "AIFileOrganizer");
+        string duplicateReviewPath = Path.Combine(downloadsPath, "Duplicates_Review");
+
+        HashSet<string> supportedExtensions = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ".pdf", ".docx", ".txt", ".jpg", ".jpeg", ".png", ".gif", ".heic", ".webp",
+            ".mp4", ".mov", ".avi", ".mkv", ".mp3", ".wav", ".m4a", ".zip", ".rar", ".7z",
+            ".dmg", ".pkg", ".xlsx", ".xls", ".csv", ".ppt", ".pptx"
+        };
+
+        var ollama = new OllamaApiClient(
+            new Uri("http://localhost:11434"),
+            OllamaModel);
+
+        InitializeDatabase();
+
+        return await ScanFiles(
+            foldersToScan,
+            organizedPath,
+            projectPath,
+            duplicateReviewPath,
+            supportedExtensions,
+            ollama,
+            scanLimit);
+    }
+
     static async Task Main()
     {
         string homePath =

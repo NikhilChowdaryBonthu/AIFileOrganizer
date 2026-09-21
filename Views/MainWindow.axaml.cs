@@ -1,0 +1,89 @@
+using System.Net.Http;
+using Avalonia.Controls;
+using Avalonia.Interactivity;
+
+namespace AIFileOrganizer.Desktop.Views;
+
+public partial class MainWindow : Window
+{
+    public MainWindow()
+    {
+        InitializeComponent();
+        _ = CheckOllamaAsync();
+    }
+
+    private async Task CheckOllamaAsync()
+    {
+        try
+        {
+            using HttpClient client = new() { Timeout = TimeSpan.FromSeconds(3) };
+            using HttpResponseMessage response = await client.GetAsync("http://localhost:11434/api/tags");
+            OllamaStatusText.Text = response.IsSuccessStatusCode ? "Ollama is ready" : "Ollama needs attention";
+        }
+        catch
+        {
+            OllamaStatusText.Text = "Open Ollama to classify files";
+        }
+    }
+
+    private async void StartScan_Click(object? sender, RoutedEventArgs e)
+    {
+        int selectedFolders = new[]
+        {
+            DownloadsCheckBox.IsChecked == true,
+            DesktopCheckBox.IsChecked == true,
+            DocumentsCheckBox.IsChecked == true
+        }.Count(selected => selected);
+
+        if (selectedFolders == 0)
+        {
+            ScanSummaryText.Text = "Choose at least one folder first.";
+            return;
+        }
+
+        int scanLimit = ScanLimitBox.SelectedIndex switch
+        {
+            0 => 20,
+            2 => 100,
+            _ => 50
+        };
+
+        string homePath = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        List<string> folders = new();
+
+        if (DownloadsCheckBox.IsChecked == true)
+            folders.Add(Path.Combine(homePath, "Downloads"));
+        if (DesktopCheckBox.IsChecked == true)
+            folders.Add(Path.Combine(homePath, "Desktop"));
+        if (DocumentsCheckBox.IsChecked == true)
+            folders.Add(Path.Combine(homePath, "Documents"));
+
+        ScanButton.IsEnabled = false;
+        ResultsList.ItemsSource = null;
+        ScanSummaryText.Text = $"Scanning up to {scanLimit} files. This may take a moment for documents that need local AI classification.";
+        ActivityText.Text = "Scanning safely. No files are being moved.";
+
+        try
+        {
+            List<MovePlan> plans = await Task.Run(
+                () => Program.ScanFromDesktopAsync(folders.ToArray(), scanLimit));
+
+            ResultsList.ItemsSource = plans.Select(plan =>
+                $"{Path.GetFileName(plan.Source)}  →  {plan.Category} / {plan.Subcategory}").ToList();
+
+            ScanSummaryText.Text = plans.Count == 0
+                ? "No supported files were found in the selected folders."
+                : $"Found {plans.Count} files. Review the suggestions below; no file has been moved.";
+            ActivityText.Text = "Scan complete. The next step will add approval and safe move controls.";
+        }
+        catch (Exception ex)
+        {
+            ScanSummaryText.Text = "The scan could not finish.";
+            ActivityText.Text = ex.Message;
+        }
+        finally
+        {
+            ScanButton.IsEnabled = true;
+        }
+    }
+}
