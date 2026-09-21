@@ -6,6 +6,8 @@ namespace AIFileOrganizer.Desktop.Views;
 
 public partial class MainWindow : Window
 {
+    private List<MovePlan> _movePlans = new();
+
     public MainWindow()
     {
         InitializeComponent();
@@ -68,13 +70,21 @@ public partial class MainWindow : Window
             List<MovePlan> plans = await Task.Run(
                 () => Program.ScanFromDesktopAsync(folders.ToArray(), scanLimit));
 
-            ResultsList.ItemsSource = plans.Select(plan =>
-                $"{Path.GetFileName(plan.Source)}  →  {plan.Category} / {plan.Subcategory}").ToList();
+            _movePlans = plans;
+
+            ResultsList.ItemsSource = plans.Select(plan => new CheckBox
+            {
+                Content = $"{Path.GetFileName(plan.Source)}  →  {plan.Category} / {plan.Subcategory}",
+                IsChecked = true,
+                Tag = plan
+            }).ToList();
 
             ScanSummaryText.Text = plans.Count == 0
                 ? "No supported files were found in the selected folders."
                 : $"Found {plans.Count} files. Review the suggestions below; no file has been moved.";
-            ActivityText.Text = "Scan complete. The next step will add approval and safe move controls.";
+            MoveConfirmationCheckBox.IsEnabled = plans.Count > 0;
+            OrganizeButton.IsEnabled = plans.Count > 0;
+            ActivityText.Text = "Scan complete. Untick any file you do not want to organize, then confirm the remaining selection.";
         }
         catch (Exception ex)
         {
@@ -85,5 +95,41 @@ public partial class MainWindow : Window
         {
             ScanButton.IsEnabled = true;
         }
+    }
+
+    private async void Organize_Click(object? sender, RoutedEventArgs e)
+    {
+        if (MoveConfirmationCheckBox.IsChecked != true)
+        {
+            ActivityText.Text = "Tick the confirmation box after reviewing the selected files.";
+            return;
+        }
+
+        List<MovePlan> approvedPlans = ResultsList.ItemsSource
+            ?.OfType<CheckBox>()
+            .Where(item => item.IsChecked == true)
+            .Select(item => (MovePlan)item.Tag!)
+            .ToList()
+            ?? new List<MovePlan>();
+
+        if (approvedPlans.Count == 0)
+        {
+            ActivityText.Text = "Select at least one file to organize.";
+            return;
+        }
+
+        OrganizeButton.IsEnabled = false;
+        ScanButton.IsEnabled = false;
+        ActivityText.Text = $"Organizing {approvedPlans.Count} reviewed file(s).";
+
+        OrganizationResult result = await Task.Run(
+            () => Program.OrganizeFromDesktop(approvedPlans));
+
+        ScanSummaryText.Text = $"Organization complete: {result.Moved} moved, {result.Renamed} renamed, {result.Duplicates} duplicate(s) sent to review, {result.Errors} issue(s).";
+        ActivityText.Text = "Every completed move is stored in local history and can be undone from the console app.";
+        MoveConfirmationCheckBox.IsEnabled = false;
+        ResultsList.ItemsSource = null;
+        _movePlans.Clear();
+        ScanButton.IsEnabled = true;
     }
 }

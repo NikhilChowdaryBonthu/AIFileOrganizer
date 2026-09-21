@@ -34,13 +34,12 @@
       </Border>
 
       <Border Grid.Column="1" Background="#20242B" CornerRadius="12" Padding="22">
-        <Grid RowDefinitions="Auto,Auto,*,Auto" RowSpacing="12">
+        <Grid RowDefinitions="Auto,Auto,*,Auto,Auto" RowSpacing="12">
           <TextBlock Text="2. Review suggestions" FontSize="19" FontWeight="SemiBold" />
           <TextBlock Grid.Row="1" x:Name="ScanSummaryText" Text="Choose folders and start a scan. Results will appear here." TextWrapping="Wrap" Opacity="0.75" />
           <ListBox Grid.Row="2" x:Name="ResultsList" BorderThickness="0" />
-          <Border Grid.Row="3" Background="#2B3038" CornerRadius="8" Padding="12">
-            <TextBlock Text="File moves and undo controls will be connected after the desktop scan is verified." TextWrapping="Wrap" Opacity="0.65" />
-          </Border>
+          <CheckBox Grid.Row="3" x:Name="MoveConfirmationCheckBox" Content="I reviewed these suggestions and want to organize the selected files." IsEnabled="False" />
+          <Button Grid.Row="4" x:Name="OrganizeButton" Content="Organize reviewed files" Click="Organize_Click" IsEnabled="False" HorizontalAlignment="Left" Padding="20,10" />
         </Grid>
       </Border>
     </Grid>

@@ -55,6 +55,85 @@ class Program
             scanLimit);
     }
 
+    internal static OrganizationResult OrganizeFromDesktop(
+        IEnumerable<MovePlan> movePlans)
+    {
+        InitializeDatabase();
+
+        string homePath = Environment.GetFolderPath(
+            Environment.SpecialFolder.UserProfile);
+        string duplicateReviewPath = Path.Combine(
+            homePath,
+            "Downloads",
+            "Duplicates_Review");
+        string operationId = Guid.NewGuid().ToString();
+        int moved = 0;
+        int renamed = 0;
+        int duplicates = 0;
+        int errors = 0;
+
+        foreach (MovePlan plan in movePlans)
+        {
+            try
+            {
+                if (!File.Exists(plan.Source))
+                {
+                    errors++;
+                    continue;
+                }
+
+                string? destinationFolder = Path.GetDirectoryName(plan.Destination);
+                if (string.IsNullOrWhiteSpace(destinationFolder))
+                {
+                    errors++;
+                    continue;
+                }
+
+                Directory.CreateDirectory(destinationFolder);
+                string finalDestination = plan.Destination;
+                string action = "MOVED";
+
+                if (File.Exists(finalDestination))
+                {
+                    if (FilesAreIdentical(plan.Source, finalDestination))
+                    {
+                        Directory.CreateDirectory(duplicateReviewPath);
+                        finalDestination = GetUniqueDuplicatePath(
+                            duplicateReviewPath,
+                            Path.GetFileName(plan.Source));
+                        action = "DUPLICATE";
+                        duplicates++;
+                    }
+                    else
+                    {
+                        finalDestination = GetUniqueDestinationPath(finalDestination);
+                        action = "VERSIONED";
+                        renamed++;
+                    }
+                }
+                else
+                {
+                    moved++;
+                }
+
+                File.Move(plan.Source, finalDestination);
+                RecordHistory(
+                    action,
+                    operationId,
+                    plan.Source,
+                    finalDestination,
+                    plan.Category,
+                    plan.Subcategory);
+            }
+            catch
+            {
+                errors++;
+            }
+        }
+
+        return new OrganizationResult(moved, renamed, duplicates, errors);
+    }
+
     static async Task Main()
     {
         string homePath =
@@ -2593,4 +2672,11 @@ record MovePlan(
     string Destination,
     string Category,
     string Subcategory
+);
+
+record OrganizationResult(
+    int Moved,
+    int Renamed,
+    int Duplicates,
+    int Errors
 );
