@@ -53,13 +53,6 @@ class Program
                 "Duplicates_Review"
             );
 
-        string[] foldersToScan =
-        {
-            downloadsPath,
-            desktopPath,
-            documentsPath
-        };
-
         HashSet<string> supportedExtensions =
             new(StringComparer.OrdinalIgnoreCase)
             {
@@ -128,6 +121,21 @@ class Program
 
             if (choice == "1")
             {
+                string[] foldersToScan = ChooseFoldersToScan(
+                    downloadsPath,
+                    desktopPath,
+                    documentsPath
+                );
+
+                if (foldersToScan.Length == 0)
+                {
+                    Console.WriteLine();
+                    Console.WriteLine("No valid folder was selected.");
+                    Console.WriteLine("Press ENTER to return to the menu.");
+                    Console.ReadLine();
+                    continue;
+                }
+
                 int scanLimit = ChooseScanLimit();
 
                 movePlans = await ScanFiles(
@@ -274,6 +282,55 @@ class Program
             "4" => int.MaxValue,
             _ => 20
         };
+    }
+
+    static string[] ChooseFoldersToScan(
+        string downloadsPath,
+        string desktopPath,
+        string documentsPath)
+    {
+        Console.WriteLine("Choose where to scan:");
+        Console.WriteLine("1. Downloads");
+        Console.WriteLine("2. Desktop");
+        Console.WriteLine("3. Documents");
+        Console.WriteLine("4. Downloads, Desktop, and Documents");
+        Console.WriteLine("5. Enter a custom folder path");
+        Console.WriteLine();
+        Console.Write("Choose an option: ");
+
+        string? choice = Console.ReadLine();
+
+        if (choice == "1")
+        {
+            return new[] { downloadsPath };
+        }
+
+        if (choice == "2")
+        {
+            return new[] { desktopPath };
+        }
+
+        if (choice == "3")
+        {
+            return new[] { documentsPath };
+        }
+
+        if (choice == "5")
+        {
+            Console.Write("Enter the full folder path: ");
+            string? customPath = Console.ReadLine()?.Trim();
+
+            if (!string.IsNullOrWhiteSpace(customPath) &&
+                Directory.Exists(customPath))
+            {
+                return new[] { Path.GetFullPath(customPath) };
+            }
+
+            Console.WriteLine("That folder does not exist.");
+            return Array.Empty<string>();
+        }
+
+        return new[] { downloadsPath, desktopPath, documentsPath };
     }
 
     static async Task<List<MovePlan>> ScanFiles(
