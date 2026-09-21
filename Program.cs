@@ -550,6 +550,55 @@ class Program
     static List<MovePlan> ReviewMovePlans(
         List<MovePlan> movePlans)
     {
+        List<MovePlan> automaticallyApproved = movePlans
+            .Where(plan => !NeedsReview(plan))
+            .ToList();
+
+        List<MovePlan> uncertainPlans = movePlans
+            .Where(NeedsReview)
+            .ToList();
+
+        Console.WriteLine();
+        Console.WriteLine("========== SMART REVIEW SUMMARY ==========");
+        Console.WriteLine();
+
+        foreach (var group in automaticallyApproved
+            .GroupBy(plan => $"{plan.Category}/{plan.Subcategory}")
+            .OrderByDescending(group => group.Count()))
+        {
+            Console.WriteLine($"{group.Key}: {group.Count()} files approved");
+        }
+
+        Console.WriteLine();
+        Console.WriteLine($"Files approved automatically: {automaticallyApproved.Count}");
+        Console.WriteLine($"Files needing your review: {uncertainPlans.Count}");
+
+        if (uncertainPlans.Count == 0)
+        {
+            return automaticallyApproved;
+        }
+
+        Console.WriteLine();
+        Console.Write("Review the uncertain files now? (Y/N): ");
+
+        if (!string.Equals(
+            Console.ReadLine(),
+            "Y",
+            StringComparison.OrdinalIgnoreCase))
+        {
+            Console.WriteLine("Uncertain files will stay in their current folders.");
+            return automaticallyApproved;
+        }
+
+        automaticallyApproved.AddRange(
+            ReviewIndividualPlans(uncertainPlans));
+
+        return automaticallyApproved;
+    }
+
+    static List<MovePlan> ReviewIndividualPlans(
+        List<MovePlan> movePlans)
+    {
         Console.WriteLine();
         Console.WriteLine(
             "========== REVIEW ORGANIZATION =========="
@@ -619,7 +668,7 @@ class Program
 
                 if (string.Equals(action, "Q", StringComparison.OrdinalIgnoreCase))
                 {
-                    approvedPlans.AddRange(movePlans.Skip(index));
+                    skipped += movePlans.Count - index;
                     PrintReviewSummary(approvedPlans.Count, skipped);
                     return approvedPlans;
                 }
@@ -687,6 +736,16 @@ class Program
         Console.WriteLine();
         Console.WriteLine($"Files approved to organize: {approved}");
         Console.WriteLine($"Files skipped: {skipped}");
+    }
+
+    static bool NeedsReview(MovePlan plan)
+    {
+        return plan.Category.Equals(
+            "Other",
+            StringComparison.OrdinalIgnoreCase) &&
+            plan.Subcategory.Equals(
+                "Uncategorized",
+                StringComparison.OrdinalIgnoreCase);
     }
     static void UndoLastOrganization()
 {
