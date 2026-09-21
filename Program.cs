@@ -4,15 +4,21 @@ using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
 using OllamaSharp;
+using OllamaSharp.Models;
 using DocumentFormat.OpenXml.Packaging;
 using UglyToad.PdfPig;
 using UglyToad.PdfPig.DocumentLayoutAnalysis.TextExtractor;
 
 class Program
 {
+    private const string OllamaModel = "qwen3:4b";
+    private const int MaxDocumentCharacters = 2500;
+    private static readonly TimeSpan AiTimeout = TimeSpan.FromSeconds(45);
+
     static async Task Main()
     {
         string homePath =
@@ -94,7 +100,7 @@ class Program
 
         var ollama = new OllamaApiClient(
             new Uri("http://localhost:11434"),
-            "qwen3:4b"
+            OllamaModel
         );
         InitializeDatabase();
 
@@ -121,39 +127,18 @@ class Program
             Console.WriteLine();
 
             if (choice == "1")
-            
             {
-                Console.WriteLine("Choose scan size:");
-Console.WriteLine("1. 20 files");
-Console.WriteLine("2. 50 files");
-Console.WriteLine("3. 100 files");
-Console.WriteLine("4. All supported files");
-Console.WriteLine();
-Console.Write("Choose an option: ");
+                int scanLimit = ChooseScanLimit();
 
-string? scanChoice =
-    Console.ReadLine();
-
-int scanLimit =
-    scanChoice switch
-    {
-        "2" => 50,
-        "3" => 100,
-        "4" => int.MaxValue,
-        _ => 20
-    };
-
-Console.WriteLine();
-               movePlans =
-    await ScanFiles(
-        foldersToScan,
-        organizedPath,
-        projectPath,
-        duplicateReviewPath,
-        supportedExtensions,
-        ollama,
-        scanLimit
-    );
+                movePlans = await ScanFiles(
+                    foldersToScan,
+                    organizedPath,
+                    projectPath,
+                    duplicateReviewPath,
+                    supportedExtensions,
+                    ollama,
+                    scanLimit
+                );
 
                 Console.WriteLine();
                 Console.WriteLine(
@@ -272,7 +257,26 @@ Console.WriteLine();
             }
         }
     }
-static async Task<List<MovePlan>> ScanFiles(
+    static int ChooseScanLimit()
+    {
+        Console.WriteLine("Choose scan size:");
+        Console.WriteLine("1. 20 files");
+        Console.WriteLine("2. 50 files");
+        Console.WriteLine("3. 100 files");
+        Console.WriteLine("4. All supported files");
+        Console.WriteLine();
+        Console.Write("Choose an option: ");
+
+        return Console.ReadLine() switch
+        {
+            "2" => 50,
+            "3" => 100,
+            "4" => int.MaxValue,
+            _ => 20
+        };
+    }
+
+    static async Task<List<MovePlan>> ScanFiles(
     string[] foldersToScan,
     string organizedPath,
     string projectPath,
@@ -311,28 +315,11 @@ static async Task<List<MovePlan>> ScanFiles(
                     continue;
                 }
 
-                if (
-                    Path.GetFileName(file)
-                        .Equals(
-                            ".DS_Store",
-                            StringComparison.OrdinalIgnoreCase
-                        )
-                )
-                {
-                    continue;
-                }
-
-                if (IsInsideFolder(file, organizedPath))
-                {
-                    continue;
-                }
-
-                if (IsInsideFolder(file, projectPath))
-                {
-                    continue;
-                }
-
-                if (IsInsideFolder(file, duplicateReviewPath))
+                if (ShouldSkipFile(
+                    file,
+                    organizedPath,
+                    projectPath,
+                    duplicateReviewPath))
                 {
                     continue;
                 }
@@ -341,11 +328,10 @@ static async Task<List<MovePlan>> ScanFiles(
             }
         }
 
-        // Safety limit while the project is still being tested.
         files = files
-    .Distinct(StringComparer.OrdinalIgnoreCase)
-    .Take(scanLimit)
-    .ToList();
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(scanLimit)
+            .ToList();
 
         Console.WriteLine();
         Console.WriteLine(
@@ -355,8 +341,9 @@ static async Task<List<MovePlan>> ScanFiles(
         List<MovePlan> movePlans =
             new();
 
-        foreach (string file in files)
+        for (int index = 0; index < files.Count; index++)
         {
+            string file = files[index];
             string fileName =
                 Path.GetFileName(file);
 
@@ -366,7 +353,7 @@ static async Task<List<MovePlan>> ScanFiles(
 
             Console.WriteLine();
             Console.WriteLine(
-                $"Analyzing: {fileName}"
+                $"[{index + 1}/{files.Count}] Analyzing: {fileName}"
             );
 
             try
@@ -380,15 +367,25 @@ static async Task<List<MovePlan>> ScanFiles(
                     extension == ".txt"
                 )
                 {
-                    classification =
-                        await ClassifyDocumentWithAI(
+                    Classification? cachedClassification =
+                        TryGetCachedClassification(file);
+
+                    if (cachedClassification != null)
+                    {
+                        classification = cachedClassification;
+                        method = "Saved local result";
+                    }
+                    else
+                    {
+                        classification = await ClassifyDocumentWithAI(
                             file,
                             fileName,
                             ollama
                         );
 
-                    method =
-                        "Local AI";
+                        SaveClassificationCache(file, classification);
+                        method = "Local AI";
+                    }
                 }
                 else
                 {
@@ -1136,73 +1133,51 @@ static async Task<List<MovePlan>> ScanFiles(
                 fileName;
         }
 
-        if (content.Length > 6000)
+        if (content.Length > MaxDocumentCharacters)
         {
             content =
-                content[..6000];
+                content[..MaxDocumentCharacters];
         }
 
         string prompt =
             $"""
-            You are organizing files on a personal computer.
+            Classify the file into one exact value from this list:
+            Career|Resumes, Career|Job Descriptions, Career|Interviews,
+            Career|Employment, Career|Professional, Education|Assignments,
+            Education|Research, Education|Academic Articles, Education|Admissions,
+            Education|Certificates, Education|Course Materials,
+            Finance|Bank Statements, Finance|Bills, Finance|Receipts,
+            Finance|Taxes, Finance|Other Finance, Personal|Personal Documents,
+            Personal|Letters, Personal|Other Personal, Other|Uncategorized.
 
-            Analyze this document.
+            Reply with only Category|Subcategory. Do not explain your choice.
 
-            Filename:
-            {fileName}
-
-            Document content:
-            {content}
-
-            Choose exactly one category
-            and exactly one subcategory.
-
-            Career:
-            - Resumes
-            - Job Descriptions
-            - Interviews
-            - Employment
-            - Professional
-
-            Education:
-            - Assignments
-            - Research
-            - Academic Articles
-            - Admissions
-            - Certificates
-            - Course Materials
-
-            Finance:
-            - Bank Statements
-            - Bills
-            - Receipts
-            - Taxes
-            - Other Finance
-
-            Personal:
-            - Personal Documents
-            - Letters
-            - Other Personal
-
-            Other:
-            - Uncategorized
-
-            Return ONLY:
-
-            Category|Subcategory
-
-            Example:
-            Education|Assignments
-
-            Do not add explanations.
+            Filename: {fileName}
+            Content: {content}
             """;
 
         StringBuilder aiResponse =
             new();
 
+        using CancellationTokenSource timeout =
+            new(AiTimeout);
+
+        GenerateRequest request =
+            new()
+            {
+                Model = OllamaModel,
+                Prompt = prompt,
+                Think = false,
+                Options = new RequestOptions
+                {
+                    NumPredict = 16,
+                    Temperature = 0
+                }
+            };
+
         await foreach (
             var response in
-            ollama.GenerateAsync(prompt)
+            ollama.GenerateAsync(request, timeout.Token)
         )
         {
             if (
@@ -1444,6 +1419,48 @@ if (isPersonalDocument)
             return Enumerable
                 .Empty<string>();
         }
+    }
+
+    static bool ShouldSkipFile(
+        string filePath,
+        string organizedPath,
+        string projectPath,
+        string duplicateReviewPath)
+    {
+        if (Path.GetFileName(filePath).Equals(
+            ".DS_Store",
+            StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if (IsInsideFolder(filePath, organizedPath) ||
+            IsInsideFolder(filePath, projectPath) ||
+            IsInsideFolder(filePath, duplicateReviewPath))
+        {
+            return true;
+        }
+
+        string[] pathParts =
+            filePath.Split(
+                new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar },
+                StringSplitOptions.RemoveEmptyEntries);
+
+        if (pathParts.Any(part =>
+            part.Equals("bin", StringComparison.OrdinalIgnoreCase) ||
+            part.Equals("obj", StringComparison.OrdinalIgnoreCase) ||
+            part.Equals("node_modules", StringComparison.OrdinalIgnoreCase) ||
+            part.Equals(".git", StringComparison.OrdinalIgnoreCase) ||
+            part.Equals("Library", StringComparison.OrdinalIgnoreCase) ||
+            part.Equals("Caches", StringComparison.OrdinalIgnoreCase) ||
+            part.StartsWith(".", StringComparison.Ordinal)))
+        {
+            return true;
+        }
+
+        return Path.GetFileName(filePath).EndsWith(
+            ".csproj.FileListAbsolute.txt",
+            StringComparison.OrdinalIgnoreCase);
     }
 
     static bool IsInsideFolder(
@@ -1897,6 +1914,126 @@ if (isPersonalDocument)
             );
 
         command.ExecuteNonQuery();
+
+        string createCacheSql =
+            """
+            CREATE TABLE IF NOT EXISTS ClassificationCache
+            (
+                SourcePath TEXT PRIMARY KEY,
+                FileSize INTEGER NOT NULL,
+                LastWriteUtcTicks INTEGER NOT NULL,
+                Category TEXT NOT NULL,
+                Subcategory TEXT NOT NULL,
+                UpdatedAt TEXT NOT NULL
+            );
+            """;
+
+        using SqliteCommand cacheCommand =
+            new(createCacheSql, connection);
+
+        cacheCommand.ExecuteNonQuery();
+    }
+
+    static Classification? TryGetCachedClassification(string filePath)
+    {
+        try
+        {
+            FileInfo fileInfo = new(filePath);
+
+            if (!fileInfo.Exists)
+            {
+                return null;
+            }
+
+            using SqliteConnection connection =
+                new($"Data Source={GetDatabasePath()}");
+
+            connection.Open();
+
+            using SqliteCommand command =
+                new(
+                    """
+                    SELECT Category, Subcategory
+                    FROM ClassificationCache
+                    WHERE SourcePath = $sourcePath
+                      AND FileSize = $fileSize
+                      AND LastWriteUtcTicks = $lastWriteUtcTicks;
+                    """,
+                    connection
+                );
+
+            command.Parameters.AddWithValue("$sourcePath", filePath);
+            command.Parameters.AddWithValue("$fileSize", fileInfo.Length);
+            command.Parameters.AddWithValue(
+                "$lastWriteUtcTicks",
+                fileInfo.LastWriteTimeUtc.Ticks);
+
+            using SqliteDataReader reader = command.ExecuteReader();
+
+            return reader.Read()
+                ? new Classification(reader.GetString(0), reader.GetString(1))
+                : null;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    static void SaveClassificationCache(
+        string filePath,
+        Classification classification)
+    {
+        FileInfo fileInfo = new(filePath);
+
+        using SqliteConnection connection =
+            new($"Data Source={GetDatabasePath()}");
+
+        connection.Open();
+
+        using SqliteCommand command =
+            new(
+                """
+                INSERT INTO ClassificationCache
+                (
+                    SourcePath,
+                    FileSize,
+                    LastWriteUtcTicks,
+                    Category,
+                    Subcategory,
+                    UpdatedAt
+                )
+                VALUES
+                (
+                    $sourcePath,
+                    $fileSize,
+                    $lastWriteUtcTicks,
+                    $category,
+                    $subcategory,
+                    $updatedAt
+                )
+                ON CONFLICT(SourcePath) DO UPDATE SET
+                    FileSize = excluded.FileSize,
+                    LastWriteUtcTicks = excluded.LastWriteUtcTicks,
+                    Category = excluded.Category,
+                    Subcategory = excluded.Subcategory,
+                    UpdatedAt = excluded.UpdatedAt;
+                """,
+                connection
+            );
+
+        command.Parameters.AddWithValue("$sourcePath", filePath);
+        command.Parameters.AddWithValue("$fileSize", fileInfo.Length);
+        command.Parameters.AddWithValue(
+            "$lastWriteUtcTicks",
+            fileInfo.LastWriteTimeUtc.Ticks);
+        command.Parameters.AddWithValue("$category", classification.Category);
+        command.Parameters.AddWithValue("$subcategory", classification.Subcategory);
+        command.Parameters.AddWithValue(
+            "$updatedAt",
+            DateTime.UtcNow.ToString("O"));
+
+        command.ExecuteNonQuery();
     }
 
   
@@ -2007,4 +2144,3 @@ record MovePlan(
     string Category,
     string Subcategory
 );
-
