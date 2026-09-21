@@ -14,6 +14,7 @@ A local .NET console application that helps organize files on a personal compute
 - Detect exact duplicates and filename conflicts.
 - Review only files that could not be confidently categorized.
 - Undo previous organization batches and restore files to their original folders.
+- Create a named folder in Documents and move only the reviewed, selected files into it.
 
 ## Requirements
 

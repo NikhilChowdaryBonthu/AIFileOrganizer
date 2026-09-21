@@ -31,6 +31,9 @@
           </ComboBox>
           <Button x:Name="ScanButton" Content="Start safe scan" Click="StartScan_Click" HorizontalAlignment="Left" Padding="20,10" />
           <Button x:Name="WatcherButton" Content="Start Downloads watcher" Click="ToggleWatcher_Click" HorizontalAlignment="Left" Padding="20,10" />
+          <Separator Margin="0,6" />
+          <TextBlock Text="Or create a custom folder in Documents" FontWeight="SemiBold" />
+          <TextBox x:Name="CustomFolderNameBox" PlaceholderText="Example: C# Course Files" />
         </StackPanel>
       </Border>
 
@@ -42,6 +45,7 @@
           <CheckBox Grid.Row="3" x:Name="MoveConfirmationCheckBox" Content="I reviewed these suggestions and want to organize the selected files." IsEnabled="False" />
           <StackPanel Grid.Row="4" Orientation="Horizontal" Spacing="10">
             <Button x:Name="OrganizeButton" Content="Organize reviewed files" Click="Organize_Click" IsEnabled="False" Padding="20,10" />
+            <Button x:Name="CustomFolderButton" Content="Move selected to new folder" Click="MoveToCustomFolder_Click" IsEnabled="False" Padding="20,10" />
             <Button x:Name="UndoButton" Content="Undo last organization" Click="Undo_Click" Padding="20,10" />
           </StackPanel>
         </Grid>

@@ -159,6 +159,27 @@ class Program
         return new OrganizationResult(moved, renamed, duplicates, errors);
     }
 
+    internal static OrganizationResult MoveToNewDocumentsFolder(
+        IEnumerable<MovePlan> movePlans,
+        string folderName)
+    {
+        if (!IsSafeFolderName(folderName))
+            throw new ArgumentException("Enter a folder name without slashes or special path characters.");
+
+        string documentsPath = Environment.GetFolderPath(
+            Environment.SpecialFolder.MyDocuments);
+        string destinationFolder = Path.Combine(documentsPath, folderName.Trim());
+
+        List<MovePlan> customPlans = movePlans.Select(plan => plan with
+        {
+            Destination = Path.Combine(destinationFolder, Path.GetFileName(plan.Source)),
+            Category = "Custom",
+            Subcategory = folderName.Trim()
+        }).ToList();
+
+        return OrganizeFromDesktop(customPlans);
+    }
+
     internal static UndoResult UndoLastOrganizationFromDesktop()
     {
         InitializeDatabase();

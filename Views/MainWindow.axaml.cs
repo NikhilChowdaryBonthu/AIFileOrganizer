@@ -83,6 +83,7 @@ public partial class MainWindow : Window
                 : $"Found {plans.Count} files. Review the suggestions below; no file has been moved.";
             MoveConfirmationCheckBox.IsEnabled = plans.Count > 0;
             OrganizeButton.IsEnabled = plans.Count > 0;
+            CustomFolderButton.IsEnabled = plans.Count > 0;
             ActivityText.Text = "Scan complete. Untick any file you do not want to organize, then confirm the remaining selection.";
         }
         catch (Exception ex)
@@ -180,6 +181,7 @@ public partial class MainWindow : Window
                 ResultsList.ItemsSource = _reviewItems;
                 MoveConfirmationCheckBox.IsEnabled = _movePlans.Count > 0;
                 OrganizeButton.IsEnabled = _movePlans.Count > 0;
+                CustomFolderButton.IsEnabled = _movePlans.Count > 0;
                 ScanSummaryText.Text = $"New download ready for review: {Path.GetFileName(filePath)}.";
                 ActivityText.Text = "The Downloads watcher added a suggestion. No file has been moved.";
             });
@@ -199,12 +201,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        List<MovePlan> approvedPlans = ResultsList.ItemsSource
-            ?.OfType<CheckBox>()
-            .Where(item => item.IsChecked == true)
-            .Select(item => (MovePlan)item.Tag!)
-            .ToList()
-            ?? new List<MovePlan>();
+        List<MovePlan> approvedPlans = GetApprovedPlans();
 
         if (approvedPlans.Count == 0)
         {
@@ -213,6 +210,7 @@ public partial class MainWindow : Window
         }
 
         OrganizeButton.IsEnabled = false;
+        CustomFolderButton.IsEnabled = false;
         ScanButton.IsEnabled = false;
         ActivityText.Text = $"Organizing {approvedPlans.Count} reviewed file(s).";
 
@@ -224,6 +222,66 @@ public partial class MainWindow : Window
         MoveConfirmationCheckBox.IsEnabled = false;
         ResultsList.ItemsSource = null;
         _reviewItems.Clear();
+        _movePlans.Clear();
+        _reviewItems.Clear();
+        ScanButton.IsEnabled = true;
+    }
+
+    private async void MoveToCustomFolder_Click(object? sender, RoutedEventArgs e)
+    {
+        if (MoveConfirmationCheckBox.IsChecked != true)
+        {
+            ActivityText.Text = "Tick the confirmation box after reviewing the selected files.";
+            return;
+        }
+
+        string folderName = CustomFolderNameBox.Text?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(folderName))
+        {
+            ActivityText.Text = "Enter the new folder name first.";
+            return;
+        }
+
+        List<MovePlan> approvedPlans = GetApprovedPlans();
+        if (approvedPlans.Count == 0)
+        {
+            ActivityText.Text = "Select at least one file to move.";
+            return;
+        }
+
+        OrganizeButton.IsEnabled = false;
+        CustomFolderButton.IsEnabled = false;
+        ScanButton.IsEnabled = false;
+        ActivityText.Text = $"Creating Documents/{folderName} and moving {approvedPlans.Count} reviewed file(s).";
+
+        try
+        {
+            OrganizationResult result = await Task.Run(
+                () => Program.MoveToNewDocumentsFolder(approvedPlans, folderName));
+            ScanSummaryText.Text = $"Custom-folder move complete: {result.Moved} moved, {result.Renamed} renamed, {result.Duplicates} duplicate(s), {result.Errors} issue(s).";
+            ActivityText.Text = $"Files are in Documents/{folderName}. Every completed move can be undone.";
+            ClearReviewAfterMove();
+        }
+        catch (ArgumentException ex)
+        {
+            ActivityText.Text = ex.Message;
+            OrganizeButton.IsEnabled = true;
+            CustomFolderButton.IsEnabled = true;
+            ScanButton.IsEnabled = true;
+        }
+    }
+
+    private List<MovePlan> GetApprovedPlans() => ResultsList.ItemsSource
+        ?.OfType<CheckBox>()
+        .Where(item => item.IsChecked == true)
+        .Select(item => (MovePlan)item.Tag!)
+        .ToList()
+        ?? new List<MovePlan>();
+
+    private void ClearReviewAfterMove()
+    {
+        MoveConfirmationCheckBox.IsEnabled = false;
+        ResultsList.ItemsSource = null;
         _movePlans.Clear();
         _reviewItems.Clear();
         ScanButton.IsEnabled = true;
