@@ -435,6 +435,8 @@ class Program
             {
                 Classification classification;
                 string method;
+                Classification? filenameClassification =
+                    TryClassifyByFileName(file, fileName);
 
                 if (
                     extension == ".pdf" ||
@@ -442,9 +444,6 @@ class Program
                     extension == ".txt"
                 )
                 {
-                    Classification? filenameClassification =
-                        TryClassifyDocumentByFileContext(file, fileName);
-
                     if (filenameClassification != null)
                     {
                         classification = filenameClassification;
@@ -476,15 +475,22 @@ class Program
                 }
                 else
                 {
-                    classification =
-                        ClassifyByFileContext(
-                            file,
-                            fileName,
-                            extension
-                        );
+                    if (filenameClassification != null)
+                    {
+                        classification = filenameClassification;
+                        method = "Filename and folder rule";
+                    }
+                    else
+                    {
+                        classification =
+                            ClassifyByFileContext(
+                                file,
+                                fileName,
+                                extension
+                            );
 
-                    method =
-                        "Smart File Context Rule";
+                        method = "Smart File Context Rule";
+                    }
                 }
 
                 string destinationFolder =
@@ -1403,12 +1409,42 @@ if (isPersonalDocument)
         );
     }
 
-    static Classification? TryClassifyDocumentByFileContext(
+    static Classification? TryClassifyByFileName(
         string filePath,
         string fileName)
     {
         string value =
             NormalizeForMatching($"{filePath} {fileName}");
+
+        if (ContainsAny(value,
+            "passport", "driver license", "drivers license", "driving license",
+            "social security", "ssn", "i20", "i 20", "i94", "i 94",
+            "ead", "visa", "affidavit", "medical document") ||
+            HasAnyToken(value, "dl"))
+        {
+            return new Classification("Personal", "Personal Documents");
+        }
+
+        if (ContainsAny(value,
+            "job description", "job role", "position description"))
+        {
+            return new Classification("Career", "Job Descriptions");
+        }
+
+        if (ContainsAny(value,
+            "admit letter", "admission", "transfer in", "transfer form",
+            "statement of purpose", " sop ", "recommendation letter",
+            "decision letter"))
+        {
+            return new Classification("Education", "Admissions");
+        }
+
+        if (ContainsAny(value,
+            "gre", "toefl", "tofel", "scorecard", "provisional certificate",
+            "certificate", "10 12"))
+        {
+            return new Classification("Education", "Certificates");
+        }
 
         if (ContainsAny(value,
             "resume", "curriculum vitae", "_cv", " cv.",
@@ -1476,6 +1512,17 @@ if (isPersonalDocument)
             value.Contains(
                 NormalizeForMatching(keyword),
                 StringComparison.Ordinal));
+    }
+
+    static bool HasAnyToken(string value, params string[] tokens)
+    {
+        string[] words = value.Split(
+            ' ',
+            StringSplitOptions.RemoveEmptyEntries);
+
+        return tokens.Any(token => words.Contains(
+            token,
+            StringComparer.Ordinal));
     }
 
     static string NormalizeForMatching(string value)
