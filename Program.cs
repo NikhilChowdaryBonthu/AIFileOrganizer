@@ -175,7 +175,7 @@ class Program
                 }
                 else
                 {
-                    ShowPreview(movePlans);
+                    movePlans = ReviewMovePlans(movePlans);
                 }
 
                 Console.WriteLine();
@@ -547,28 +547,24 @@ class Program
         return movePlans;
     }
 
-    static void ShowPreview(
+    static List<MovePlan> ReviewMovePlans(
         List<MovePlan> movePlans)
     {
         Console.WriteLine();
         Console.WriteLine(
-            "========== ORGANIZATION PREVIEW =========="
+            "========== REVIEW ORGANIZATION =========="
         );
         Console.WriteLine();
 
-        foreach (MovePlan plan in movePlans)
+        List<MovePlan> approvedPlans = new();
+        int skipped = 0;
+
+        for (int index = 0; index < movePlans.Count; index++)
         {
-            Console.WriteLine(
-                $"File: {Path.GetFileName(plan.Source)}"
-            );
-
-            Console.WriteLine();
-            Console.WriteLine(
-                "Current Location:"
-            );
+            MovePlan plan = movePlans[index];
 
             Console.WriteLine(
-                plan.Source
+                $"[{index + 1}/{movePlans.Count}] {Path.GetFileName(plan.Source)}"
             );
 
             Console.WriteLine();
@@ -582,23 +578,115 @@ class Program
 
             Console.WriteLine();
             Console.WriteLine(
-                "Suggested Destination:"
-            );
-
-            Console.WriteLine(
-                plan.Destination
+                $"Destination: {plan.Destination}"
             );
 
             Console.WriteLine();
             Console.WriteLine(
-                "----------------------------------------"
+                "K = keep   S = skip   C = change category   A = approve remaining   Q = stop review"
             );
+
+            while (true)
+            {
+                Console.Write("Choose an action: ");
+                string? action = Console.ReadLine();
+
+                if (string.Equals(action, "K", StringComparison.OrdinalIgnoreCase))
+                {
+                    approvedPlans.Add(plan);
+                    break;
+                }
+
+                if (string.Equals(action, "S", StringComparison.OrdinalIgnoreCase))
+                {
+                    skipped++;
+                    break;
+                }
+
+                if (string.Equals(action, "C", StringComparison.OrdinalIgnoreCase))
+                {
+                    plan = ChangeMovePlanCategory(plan);
+                    approvedPlans.Add(plan);
+                    break;
+                }
+
+                if (string.Equals(action, "A", StringComparison.OrdinalIgnoreCase))
+                {
+                    approvedPlans.AddRange(movePlans.Skip(index));
+                    PrintReviewSummary(approvedPlans.Count, skipped);
+                    return approvedPlans;
+                }
+
+                if (string.Equals(action, "Q", StringComparison.OrdinalIgnoreCase))
+                {
+                    approvedPlans.AddRange(movePlans.Skip(index));
+                    PrintReviewSummary(approvedPlans.Count, skipped);
+                    return approvedPlans;
+                }
+
+                Console.WriteLine("Choose K, S, C, A, or Q.");
+            }
+
             Console.WriteLine();
         }
 
-        Console.WriteLine(
-            $"Files ready to organize: {movePlans.Count}"
-        );
+        PrintReviewSummary(approvedPlans.Count, skipped);
+        return approvedPlans;
+    }
+
+    static MovePlan ChangeMovePlanCategory(MovePlan plan)
+    {
+        Console.Write("New category: ");
+        string? category = Console.ReadLine()?.Trim();
+        Console.Write("New subcategory: ");
+        string? subcategory = Console.ReadLine()?.Trim();
+
+        if (!IsSafeFolderName(category) || !IsSafeFolderName(subcategory))
+        {
+            Console.WriteLine("Category was not changed. Use a simple folder name without slashes.");
+            return plan;
+        }
+
+        string newCategory = category!;
+        string newSubcategory = subcategory!;
+
+        string organizedRoot = Path.GetDirectoryName(
+            Path.GetDirectoryName(
+                Path.GetDirectoryName(plan.Destination)!)!)!;
+
+        string destinationFolder = Path.Combine(
+            organizedRoot,
+            newCategory,
+            newSubcategory);
+
+        string destination = Path.Combine(
+            destinationFolder,
+            Path.GetFileName(plan.Source));
+
+        Console.WriteLine($"Updated destination: {destination}");
+
+        return new MovePlan(
+            plan.Source,
+            destination,
+            newCategory,
+            newSubcategory);
+    }
+
+    static bool IsSafeFolderName(string? value)
+    {
+        return !string.IsNullOrWhiteSpace(value) &&
+            value != "." &&
+            value != ".." &&
+            !value.Contains(Path.DirectorySeparatorChar) &&
+            !value.Contains(Path.AltDirectorySeparatorChar) &&
+            value.IndexOfAny(Path.GetInvalidFileNameChars()) < 0;
+    }
+
+    static void PrintReviewSummary(int approved, int skipped)
+    {
+        Console.WriteLine();
+        Console.WriteLine($"Files approved to organize: {approved}");
+        Console.WriteLine($"Files skipped: {skipped}");
     }
     static void UndoLastOrganization()
 {
