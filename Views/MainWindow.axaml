@@ -39,7 +39,10 @@
           <TextBlock Grid.Row="1" x:Name="ScanSummaryText" Text="Choose folders and start a scan. Results will appear here." TextWrapping="Wrap" Opacity="0.75" />
           <ListBox Grid.Row="2" x:Name="ResultsList" BorderThickness="0" />
           <CheckBox Grid.Row="3" x:Name="MoveConfirmationCheckBox" Content="I reviewed these suggestions and want to organize the selected files." IsEnabled="False" />
-          <Button Grid.Row="4" x:Name="OrganizeButton" Content="Organize reviewed files" Click="Organize_Click" IsEnabled="False" HorizontalAlignment="Left" Padding="20,10" />
+          <StackPanel Grid.Row="4" Orientation="Horizontal" Spacing="10">
+            <Button x:Name="OrganizeButton" Content="Organize reviewed files" Click="Organize_Click" IsEnabled="False" Padding="20,10" />
+            <Button x:Name="UndoButton" Content="Undo last organization" Click="Undo_Click" Padding="20,10" />
+          </StackPanel>
         </Grid>
       </Border>
     </Grid>

@@ -134,6 +134,67 @@ class Program
         return new OrganizationResult(moved, renamed, duplicates, errors);
     }
 
+    internal static UndoResult UndoLastOrganizationFromDesktop()
+    {
+        InitializeDatabase();
+        string connectionString = $"Data Source={GetDatabasePath()}";
+        using SqliteConnection connection = new(connectionString);
+        connection.Open();
+
+        using SqliteCommand operationCommand = new(
+            "SELECT OperationId FROM FileOperations WHERE IsUndone = 0 ORDER BY Id DESC LIMIT 1;",
+            connection);
+        object? operationResult = operationCommand.ExecuteScalar();
+
+        if (operationResult is null || operationResult == DBNull.Value)
+            return new UndoResult(0, 0, false);
+
+        string operationId = Convert.ToString(operationResult)!;
+        using SqliteCommand filesCommand = new(
+            "SELECT Id, SourcePath, DestinationPath FROM FileOperations WHERE OperationId = $operationId AND IsUndone = 0 ORDER BY Id DESC;",
+            connection);
+        filesCommand.Parameters.AddWithValue("$operationId", operationId);
+
+        List<(long Id, string Source, string Destination)> files = new();
+        using (SqliteDataReader reader = filesCommand.ExecuteReader())
+        {
+            while (reader.Read())
+                files.Add((reader.GetInt64(0), reader.GetString(1), reader.GetString(2)));
+        }
+
+        int restored = 0;
+        int skipped = 0;
+        foreach ((long id, string source, string destination) in files)
+        {
+            try
+            {
+                if (!File.Exists(destination) || File.Exists(source))
+                {
+                    skipped++;
+                    continue;
+                }
+
+                string? originalFolder = Path.GetDirectoryName(source);
+                if (!string.IsNullOrWhiteSpace(originalFolder))
+                    Directory.CreateDirectory(originalFolder);
+
+                File.Move(destination, source);
+                using SqliteCommand updateCommand = new(
+                    "UPDATE FileOperations SET IsUndone = 1 WHERE Id = $id;",
+                    connection);
+                updateCommand.Parameters.AddWithValue("$id", id);
+                updateCommand.ExecuteNonQuery();
+                restored++;
+            }
+            catch
+            {
+                skipped++;
+            }
+        }
+
+        return new UndoResult(restored, skipped, true);
+    }
+
     static async Task Main()
     {
         string homePath =
@@ -2679,4 +2740,10 @@ record OrganizationResult(
     int Renamed,
     int Duplicates,
     int Errors
+);
+
+record UndoResult(
+    int Restored,
+    int Skipped,
+    bool FoundOrganization
 );

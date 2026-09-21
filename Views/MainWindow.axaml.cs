@@ -132,4 +132,26 @@ public partial class MainWindow : Window
         _movePlans.Clear();
         ScanButton.IsEnabled = true;
     }
+
+    private async void Undo_Click(object? sender, RoutedEventArgs e)
+    {
+        UndoButton.IsEnabled = false;
+        ScanButton.IsEnabled = false;
+        ActivityText.Text = "Restoring the most recent organization batch.";
+
+        UndoResult result = await Task.Run(Program.UndoLastOrganizationFromDesktop);
+
+        if (!result.FoundOrganization)
+        {
+            ActivityText.Text = "There is no organization batch to undo.";
+        }
+        else
+        {
+            ScanSummaryText.Text = $"Undo complete: {result.Restored} file(s) restored and {result.Skipped} skipped.";
+            ActivityText.Text = "Files restored to their original locations. No files were deleted.";
+        }
+
+        UndoButton.IsEnabled = true;
+        ScanButton.IsEnabled = true;
+    }
 }
