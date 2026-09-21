@@ -4,6 +4,10 @@ AI File Organizer is a local Mac desktop assistant for reviewing and organizing 
 
 The app is designed for review first: it scans files, shows a suggested destination for every item, and waits for the user to choose which files to move.
 
+![AI File Organizer desktop preview](docs/desktop-preview.svg)
+
+This preview uses example data only. It does not show personal files.
+
 ## What the app does
 
 - Scan Downloads, Desktop, Documents, or a custom folder.
@@ -76,6 +80,11 @@ This creates `dist/AI File Organizer.app`. It includes the .NET runtime, so VS C
 - `Views/MainWindow.axaml` defines the desktop interface.
 - `Views/MainWindow.axaml.cs` connects the buttons and review screen to the organizer logic.
 - `scripts/package-macos.sh` builds the Apple Silicon `.app` bundle.
+
+## More documentation
+
+- [Architecture](docs/architecture.md)
+- [Changelog](CHANGELOG.md)
 
 ## Current status
 
