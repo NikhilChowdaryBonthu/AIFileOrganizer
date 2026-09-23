@@ -16,3 +16,4 @@ jobs:
           dotnet-version: 10.0.x
       - run: dotnet restore
       - run: dotnet build --configuration Release --no-restore
+      - run: dotnet run --project tests/AIFileOrganizer.Tests/AIFileOrganizer.Tests.csproj --configuration Release

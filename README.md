@@ -6,13 +6,19 @@ AI File Organizer is a local Mac desktop assistant for reviewing and organizing 
 
 The app is designed for review first: it scans files, shows a suggested destination for every item, and waits for the user to choose which files to move.
 
-![AI File Organizer desktop preview](docs/desktop-preview.svg)
+![Illustrative AI File Organizer desktop preview](docs/desktop-preview.svg)
 
-This preview uses example data only. It does not show personal files.
+This diagram uses example data only; it is not a screenshot of the running app.
+
+## Download and install on Mac
+
+Download [AI File Organizer v2.1.0 for Apple Silicon](https://github.com/NikhilChowdaryBonthu/AIFileOrganizer/releases/download/v2.1.0/AIFileOrganizer-v2.1.0-macos-arm64.zip). Unzip it, move **AI File Organizer.app** to Applications, and open it. The bundle includes the .NET runtime; it still needs [Ollama](https://ollama.com/) running locally with `qwen3:4b` (see Requirements below).
+
+The app is ad-hoc signed, not Apple notarized. macOS may display an unidentified-developer warning. Review the [release page](https://github.com/NikhilChowdaryBonthu/AIFileOrganizer/releases/tag/v2.1.0) before opening it; use macOS's Open action only if you trust this project. No account or paid service is needed.
 
 ## What the app does
 
-- Scan Downloads, Desktop, Documents, or a custom folder.
+- Scan Downloads, Desktop, Documents, or one custom folder. Selecting a custom folder scans only that folder.
 - Enter any scan size from 1 to 1000 files.
 - Classify supported files using filename rules, folder context, and local Ollama when needed.
 - Show the full destination path before a file is moved.
@@ -38,6 +44,8 @@ The organizer supports PDFs, Word documents, text files, images, videos, audio f
 5. Untick files you do not want to change.
 6. Choose one action: organize using the suggested category, create a new Documents folder, choose an existing destination folder, find exact duplicates, or permanently delete selected files after the deletion confirmation.
 7. Use Undo if you want to restore the latest app managed organization batch.
+
+For a safe first try, create a folder with copies of a few non-sensitive sample files, choose **Choose a custom folder to scan**, and review the suggestions without approving a move. The built-in **Find exact duplicates** action does not change files.
 
 ## Privacy and safety
 
@@ -66,6 +74,14 @@ ollama pull qwen3:4b
 dotnet run
 ```
 
+## Run the safety tests
+
+```bash
+dotnet run --project tests/AIFileOrganizer.Tests/AIFileOrganizer.Tests.csproj --configuration Release
+```
+
+The tests create isolated temporary files and a separate SQLite history database. They cover moves, filename conflicts, exact duplicates, Undo, and the permanent-deletion confirmation. They do not scan your personal folders.
+
 ## Build the standalone Mac app
 
 Create the app bundle with:
@@ -74,7 +90,7 @@ Create the app bundle with:
 zsh scripts/package-macos.sh
 ```
 
-This creates `dist/AI File Organizer.app`. It includes the .NET runtime, so VS Code and the .NET SDK are not required to open the packaged app. Ollama must still be running for AI based classification.
+This creates `dist/AI File Organizer.app` and verifies its ad-hoc code signature. It includes the .NET runtime, so VS Code and the .NET SDK are not required to open the packaged app. Ollama must still be running for AI based classification.
 
 ## Project files
 
@@ -82,6 +98,7 @@ This creates `dist/AI File Organizer.app`. It includes the .NET runtime, so VS C
 - `Views/MainWindow.axaml` defines the desktop interface.
 - `Views/MainWindow.axaml.cs` connects the buttons and review screen to the organizer logic.
 - `scripts/package-macos.sh` builds the Apple Silicon `.app` bundle.
+- `tests/AIFileOrganizer.Tests` contains the isolated file-safety checks.
 
 ## More documentation
 
@@ -91,4 +108,4 @@ This creates `dist/AI File Organizer.app`. It includes the .NET runtime, so VS C
 
 ## Current status
 
-Version 2 is a working local desktop organizer with manual review, custom destination folders, duplicate detection, Undo, optional Downloads watching, and standalone Mac app packaging.
+Version 2.1 is a local desktop organizer with manual review, custom source and destination folders, duplicate detection, Undo, optional Downloads watching, and standalone Mac app packaging. The app is not Apple notarized.

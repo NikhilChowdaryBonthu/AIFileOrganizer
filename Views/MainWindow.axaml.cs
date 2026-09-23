@@ -12,6 +12,7 @@ public partial class MainWindow : Window
     private readonly List<CheckBox> _reviewItems = new();
     private FileSystemWatcher? _downloadsWatcher;
     private string? _selectedDestinationFolder;
+    private string? _selectedSourceFolder;
 
     public MainWindow()
     {
@@ -42,7 +43,7 @@ public partial class MainWindow : Window
             DocumentsCheckBox.IsChecked == true
         }.Count(selected => selected);
 
-        if (selectedFolders == 0)
+        if (selectedFolders == 0 && _selectedSourceFolder is null)
         {
             ScanSummaryText.Text = "Choose at least one folder first.";
             return;
@@ -57,12 +58,19 @@ public partial class MainWindow : Window
         string homePath = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         List<string> folders = new();
 
-        if (DownloadsCheckBox.IsChecked == true)
-            folders.Add(Path.Combine(homePath, "Downloads"));
-        if (DesktopCheckBox.IsChecked == true)
-            folders.Add(Path.Combine(homePath, "Desktop"));
-        if (DocumentsCheckBox.IsChecked == true)
-            folders.Add(Path.Combine(homePath, "Documents"));
+        if (_selectedSourceFolder is not null)
+        {
+            folders.Add(_selectedSourceFolder);
+        }
+        else
+        {
+            if (DownloadsCheckBox.IsChecked == true)
+                folders.Add(Path.Combine(homePath, "Downloads"));
+            if (DesktopCheckBox.IsChecked == true)
+                folders.Add(Path.Combine(homePath, "Desktop"));
+            if (DocumentsCheckBox.IsChecked == true)
+                folders.Add(Path.Combine(homePath, "Documents"));
+        }
 
         ScanButton.IsEnabled = false;
         ResultsList.ItemsSource = null;
@@ -102,6 +110,36 @@ public partial class MainWindow : Window
         }
     }
 
+    private async void ChooseSourceFolder_Click(object? sender, RoutedEventArgs e)
+    {
+        IReadOnlyList<IStorageFolder> folders = await StorageProvider.OpenFolderPickerAsync(
+            new FolderPickerOpenOptions { Title = "Choose a folder to scan" });
+        if (folders.Count == 0)
+            return;
+
+        string? path = folders[0].TryGetLocalPath();
+        if (path is null)
+            return;
+
+        _selectedSourceFolder = path;
+        DownloadsCheckBox.IsChecked = false;
+        DesktopCheckBox.IsChecked = false;
+        DocumentsCheckBox.IsChecked = false;
+        ClearSourceFolderButton.IsEnabled = true;
+        SourceFolderText.Text = $"Custom scan folder: {Path.GetFileName(Path.TrimEndingDirectorySeparator(path))}";
+        ActivityText.Text = "Only the chosen folder will be scanned. No files have been moved.";
+    }
+
+    private void ClearSourceFolder_Click(object? sender, RoutedEventArgs e)
+    {
+        _selectedSourceFolder = null;
+        DownloadsCheckBox.IsChecked = true;
+        DesktopCheckBox.IsChecked = true;
+        DocumentsCheckBox.IsChecked = true;
+        ClearSourceFolderButton.IsEnabled = false;
+        SourceFolderText.Text = "Default folders selected above";
+    }
+
     private CheckBox CreateReviewItem(MovePlan plan)
     {
         StackPanel details = new() { Spacing = 2 };
@@ -112,7 +150,7 @@ public partial class MainWindow : Window
         });
         details.Children.Add(new TextBlock
         {
-            Text = $"Destination: {plan.Destination}",
+            Text = $"Destination: {FormatDisplayPath(plan.Destination)}",
             FontSize = 11,
             Opacity = 0.65,
             TextWrapping = Avalonia.Media.TextWrapping.Wrap
@@ -125,6 +163,14 @@ public partial class MainWindow : Window
             Tag = plan,
             Margin = new Avalonia.Thickness(0, 0, 0, 8)
         };
+    }
+
+    private static string FormatDisplayPath(string path)
+    {
+        string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        return path.StartsWith(home + Path.DirectorySeparatorChar, StringComparison.Ordinal)
+            ? "~" + path[home.Length..]
+            : path;
     }
 
     private void ToggleWatcher_Click(object? sender, RoutedEventArgs e)
@@ -362,7 +408,8 @@ public partial class MainWindow : Window
         }
         DeleteButton.IsEnabled = false;
         ActivityText.Text = $"Permanently deleting {selectedPlans.Count} selected file(s).";
-        int deleted = await Task.Run(() => Program.DeleteSelectedFiles(selectedPlans));
+        bool isConfirmed = DeleteConfirmationCheckBox.IsChecked == true;
+        int deleted = await Task.Run(() => Program.DeleteSelectedFiles(selectedPlans, isConfirmed));
         _reviewItems.RemoveAll(item => item.IsChecked == true);
         _movePlans.RemoveAll(plan => selectedPlans.Contains(plan));
         ResultsList.ItemsSource = null;

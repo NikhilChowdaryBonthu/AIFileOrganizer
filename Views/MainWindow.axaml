@@ -2,7 +2,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="AIFileOrganizer.Desktop.Views.MainWindow"
         Title="AI File Organizer"
-        Width="1024" Height="700" MinWidth="850" MinHeight="560">
+        Width="1180" Height="780" MinWidth="900" MinHeight="620">
   <Grid RowDefinitions="Auto,*,Auto" Margin="30">
     <Grid ColumnDefinitions="*,Auto">
       <StackPanel Spacing="4">
@@ -16,12 +16,16 @@
 
     <Grid Grid.Row="1" ColumnDefinitions="1.05*,1.4*" ColumnSpacing="26" Margin="0,34,0,20">
       <Border Background="#20242B" CornerRadius="12" Padding="22">
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
         <StackPanel Spacing="18">
           <TextBlock Text="1. Choose folders to review" FontSize="19" FontWeight="SemiBold" />
           <TextBlock Text="Your files stay where they are until you review and approve a move." TextWrapping="Wrap" Opacity="0.75" />
           <CheckBox x:Name="DownloadsCheckBox" Content="Downloads" IsChecked="True" FontSize="16" />
           <CheckBox x:Name="DesktopCheckBox" Content="Desktop" IsChecked="True" FontSize="16" />
           <CheckBox x:Name="DocumentsCheckBox" Content="Documents" IsChecked="True" FontSize="16" />
+          <Button x:Name="ChooseSourceFolderButton" Content="Choose a custom folder to scan" Click="ChooseSourceFolder_Click" HorizontalAlignment="Left" Padding="12,8" />
+          <Button x:Name="ClearSourceFolderButton" Content="Use default folders instead" Click="ClearSourceFolder_Click" HorizontalAlignment="Left" Padding="12,8" IsEnabled="False" />
+          <TextBlock x:Name="SourceFolderText" Text="Default folders selected above" TextWrapping="Wrap" Opacity="0.7" />
           <Separator Margin="0,6" />
           <TextBlock Text="Scan limit" FontWeight="SemiBold" />
           <TextBox x:Name="ScanLimitTextBox" Text="20" Width="160" HorizontalAlignment="Left" PlaceholderText="Example: 4" />
@@ -32,6 +36,7 @@
           <TextBox x:Name="CustomFolderNameBox" PlaceholderText="Example: C# Course Files" />
           <Button x:Name="ChooseFolderButton" Content="Choose an existing destination folder" Click="ChooseFolder_Click" HorizontalAlignment="Left" Padding="12,8" />
         </StackPanel>
+        </ScrollViewer>
       </Border>
 
       <Border Grid.Column="1" Background="#20242B" CornerRadius="12" Padding="22">
@@ -40,12 +45,12 @@
           <TextBlock Grid.Row="1" x:Name="ScanSummaryText" Text="Choose folders and start a scan. Results will appear here." TextWrapping="Wrap" Opacity="0.75" />
           <ListBox Grid.Row="2" x:Name="ResultsList" BorderThickness="0" />
           <CheckBox Grid.Row="3" x:Name="MoveConfirmationCheckBox" Content="I reviewed these suggestions and want to organize the selected files." IsEnabled="False" />
-          <StackPanel Grid.Row="4" Orientation="Horizontal" Spacing="10">
-            <Button x:Name="OrganizeButton" Content="Organize reviewed files" Click="Organize_Click" IsEnabled="False" Padding="20,10" />
-            <Button x:Name="CustomFolderButton" Content="Move selected to new folder" Click="MoveToCustomFolder_Click" IsEnabled="False" Padding="20,10" />
-            <Button x:Name="SelectedFolderButton" Content="Move selected to chosen folder" Click="MoveToSelectedFolder_Click" IsEnabled="False" Padding="20,10" />
-            <Button x:Name="UndoButton" Content="Undo last organization" Click="Undo_Click" Padding="20,10" />
-          </StackPanel>
+          <WrapPanel Grid.Row="4" Orientation="Horizontal">
+            <Button x:Name="OrganizeButton" Content="Organize reviewed files" Click="Organize_Click" IsEnabled="False" Padding="20,10" Margin="0,0,8,8" />
+            <Button x:Name="CustomFolderButton" Content="Move selected to new folder" Click="MoveToCustomFolder_Click" IsEnabled="False" Padding="20,10" Margin="0,0,8,8" />
+            <Button x:Name="SelectedFolderButton" Content="Move selected to chosen folder" Click="MoveToSelectedFolder_Click" IsEnabled="False" Padding="20,10" Margin="0,0,8,8" />
+            <Button x:Name="UndoButton" Content="Undo last organization" Click="Undo_Click" Padding="20,10" Margin="0,0,8,8" />
+          </WrapPanel>
           <StackPanel Grid.Row="5" Spacing="6">
             <StackPanel Orientation="Horizontal" Spacing="10">
               <Button x:Name="DuplicateButton" Content="Find exact duplicates" Click="FindDuplicates_Click" IsEnabled="False" Padding="12,8" />

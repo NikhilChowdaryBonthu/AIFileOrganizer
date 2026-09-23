@@ -1,5 +1,13 @@
 # Changelog
 
+## Version 2.1
+
+- Added a custom source-folder picker so sample files can be scanned without selecting personal folders.
+- Added isolated automated checks for moves, filename conflicts, duplicates, Undo, and deletion confirmation.
+- Enforced deletion confirmation in the file-operation method as well as the desktop interface.
+- Updated app packaging to ad-hoc sign and verify the macOS bundle.
+- Added direct release download and installation guidance to the README.
+
 ## Version 2
 
 - Added the Avalonia Mac desktop interface.

@@ -2,8 +2,9 @@
 set -euo pipefail
 
 project_root="${0:A:h:h}"
-publish_dir="$project_root/dist/publish"
-app_bundle="$project_root/dist/AI File Organizer.app"
+output_root="${1:-$project_root/dist}"
+publish_dir="$output_root/publish"
+app_bundle="$output_root/AI File Organizer.app"
 
 rm -rf "$publish_dir" "$app_bundle"
 
@@ -35,13 +36,16 @@ cat > "$app_bundle/Contents/Info.plist" <<'PLIST'
   <key>CFBundlePackageType</key>
   <string>APPL</string>
   <key>CFBundleShortVersionString</key>
-  <string>2.0.0</string>
+  <string>2.1.0</string>
   <key>CFBundleVersion</key>
-  <string>2</string>
+  <string>3</string>
   <key>LSMinimumSystemVersion</key>
   <string>13.0</string>
 </dict>
 </plist>
 PLIST
+
+codesign --force --sign - "$app_bundle"
+codesign --verify --deep --strict "$app_bundle"
 
 echo "Created: $app_bundle"

@@ -83,14 +83,20 @@ class Program
     internal static OrganizationResult OrganizeFromDesktop(
         IEnumerable<MovePlan> movePlans)
     {
-        InitializeDatabase();
-
         string homePath = Environment.GetFolderPath(
             Environment.SpecialFolder.UserProfile);
-        string duplicateReviewPath = Path.Combine(
-            homePath,
-            "Downloads",
-            "Duplicates_Review");
+        return OrganizeFromDesktop(
+            movePlans,
+            GetDatabasePath(),
+            Path.Combine(homePath, "Downloads", "Duplicates_Review"));
+    }
+
+    internal static OrganizationResult OrganizeFromDesktop(
+        IEnumerable<MovePlan> movePlans,
+        string databasePath,
+        string duplicateReviewPath)
+    {
+        InitializeDatabase(databasePath);
         string operationId = Guid.NewGuid().ToString();
         int moved = 0;
         int renamed = 0;
@@ -148,7 +154,8 @@ class Program
                     plan.Source,
                     finalDestination,
                     plan.Category,
-                    plan.Subcategory);
+                    plan.Subcategory,
+                    databasePath);
             }
             catch
             {
@@ -214,8 +221,13 @@ class Program
         return groups.Values.Where(items => items.Count > 1).ToList();
     }
 
-    internal static int DeleteSelectedFiles(IEnumerable<MovePlan> movePlans)
+    internal static int DeleteSelectedFiles(
+        IEnumerable<MovePlan> movePlans,
+        bool isConfirmed)
     {
+        if (!isConfirmed)
+            throw new InvalidOperationException("Permanent deletion requires confirmation.");
+
         int deleted = 0;
         foreach (MovePlan plan in movePlans)
         {
@@ -229,8 +241,13 @@ class Program
 
     internal static UndoResult UndoLastOrganizationFromDesktop()
     {
-        InitializeDatabase();
-        string connectionString = $"Data Source={GetDatabasePath()}";
+        return UndoLastOrganizationFromDesktop(GetDatabasePath());
+    }
+
+    internal static UndoResult UndoLastOrganizationFromDesktop(string databasePath)
+    {
+        InitializeDatabase(databasePath);
+        string connectionString = $"Data Source={databasePath}";
         using SqliteConnection connection = new(connectionString);
         connection.Open();
 
@@ -2598,10 +2615,10 @@ if (isPersonalDocument)
         );
     }
 
-    static void InitializeDatabase()
+    static void InitializeDatabase(string? databasePath = null)
     {
-        string databasePath =
-            GetDatabasePath();
+        databasePath ??= GetDatabasePath();
+        Directory.CreateDirectory(Path.GetDirectoryName(databasePath)!);
 
         string connectionString =
             $"Data Source={databasePath}";
@@ -2763,15 +2780,15 @@ if (isPersonalDocument)
     string source,
     string destination,
     string category,
-    string subcategory)
+    string subcategory,
+    string? databasePath = null)
 {
     string timestamp =
         DateTime.Now.ToString(
             "yyyy-MM-dd HH:mm:ss"
         );
 
-    string databasePath =
-        GetDatabasePath();
+    databasePath ??= GetDatabasePath();
 
     string connectionString =
         $"Data Source={databasePath}";
