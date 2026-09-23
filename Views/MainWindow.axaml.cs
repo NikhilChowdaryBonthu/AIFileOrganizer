@@ -82,22 +82,7 @@ public partial class MainWindow : Window
             List<MovePlan> plans = await Task.Run(
                 () => Program.ScanFromDesktopAsync(folders.ToArray(), scanLimit));
 
-            _movePlans = plans;
-            _reviewItems.Clear();
-            _reviewItems.AddRange(plans.Select(CreateReviewItem));
-            ResultsList.ItemsSource = _reviewItems;
-
-            ScanSummaryText.Text = plans.Count == 0
-                ? "No supported files were found in the selected folders."
-                : $"Found {plans.Count} files. Review the suggestions below; no file has been moved.";
-            MoveConfirmationCheckBox.IsEnabled = plans.Count > 0;
-            OrganizeButton.IsEnabled = plans.Count > 0;
-            CustomFolderButton.IsEnabled = plans.Count > 0;
-            SelectedFolderButton.IsEnabled = plans.Count > 0;
-            DuplicateButton.IsEnabled = plans.Count > 1;
-            DeleteButton.IsEnabled = plans.Count > 0;
-            DeleteConfirmationCheckBox.IsEnabled = plans.Count > 0;
-            ActivityText.Text = "Scan complete. Untick any file you do not want to organize, then confirm the remaining selection.";
+            DisplayScanResults(plans);
         }
         catch (Exception ex)
         {
@@ -108,6 +93,37 @@ public partial class MainWindow : Window
         {
             ScanButton.IsEnabled = true;
         }
+    }
+
+    internal void ShowDemoPreview(string sourceFolder, List<MovePlan> plans)
+    {
+        _selectedSourceFolder = sourceFolder;
+        DownloadsCheckBox.IsChecked = false;
+        DesktopCheckBox.IsChecked = false;
+        DocumentsCheckBox.IsChecked = false;
+        ClearSourceFolderButton.IsEnabled = true;
+        SourceFolderText.Text = $"Custom scan folder: {Path.GetFileName(sourceFolder)}";
+        DisplayScanResults(plans);
+    }
+
+    private void DisplayScanResults(List<MovePlan> plans)
+    {
+        _movePlans = plans;
+        _reviewItems.Clear();
+        _reviewItems.AddRange(plans.Select(CreateReviewItem));
+        ResultsList.ItemsSource = _reviewItems;
+
+        ScanSummaryText.Text = plans.Count == 0
+            ? "No supported files were found in the selected folders."
+            : $"Found {plans.Count} files. Review the suggestions below; no file has been moved.";
+        MoveConfirmationCheckBox.IsEnabled = plans.Count > 0;
+        OrganizeButton.IsEnabled = plans.Count > 0;
+        CustomFolderButton.IsEnabled = plans.Count > 0;
+        SelectedFolderButton.IsEnabled = plans.Count > 0;
+        DuplicateButton.IsEnabled = plans.Count > 1;
+        DeleteButton.IsEnabled = plans.Count > 0;
+        DeleteConfirmationCheckBox.IsEnabled = plans.Count > 0;
+        ActivityText.Text = "Scan complete. Untick any file you do not want to organize, then confirm the remaining selection.";
     }
 
     private async void ChooseSourceFolder_Click(object? sender, RoutedEventArgs e)

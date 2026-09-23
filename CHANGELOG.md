@@ -1,5 +1,12 @@
 # Changelog
 
+## Version 2.1.1
+
+- Switched local text classification to Ollama structured output with a 45-second request limit.
+- Kept files visible for review with a filename/context suggestion if Ollama is unavailable.
+- Added automated outage coverage and a live two-file Ollama smoke check.
+- Replaced the illustrative preview with an actual app-interface image using synthetic files.
+
 ## Version 2.1
 
 - Added a custom source-folder picker so sample files can be scanned without selecting personal folders.

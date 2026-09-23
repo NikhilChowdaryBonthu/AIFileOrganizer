@@ -2,13 +2,14 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net.Http;
+using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
-using OllamaSharp;
-using OllamaSharp.Models;
 using DocumentFormat.OpenXml.Packaging;
 using UglyToad.PdfPig;
 using UglyToad.PdfPig.DocumentLayoutAnalysis.TextExtractor;
@@ -18,6 +19,7 @@ class Program
     private const string OllamaModel = "qwen3:4b";
     private const int MaxDocumentCharacters = 2500;
     private static readonly TimeSpan AiTimeout = TimeSpan.FromSeconds(45);
+    private static readonly Uri DefaultOllamaEndpoint = new("http://localhost:11434");
 
     internal static async Task<List<MovePlan>> ScanFromDesktopAsync(
         string[] foldersToScan,
@@ -27,6 +29,20 @@ class Program
             foldersToScan,
             scanLimit,
             null);
+    }
+
+    internal static Task<List<MovePlan>> ScanFromDesktopAsync(
+        string[] foldersToScan,
+        int scanLimit,
+        string databasePath,
+        Uri ollamaEndpoint)
+    {
+        return ScanFromDesktopAsync(
+            foldersToScan,
+            scanLimit,
+            null,
+            databasePath,
+            ollamaEndpoint);
     }
 
     internal static async Task<List<MovePlan>> ClassifyDownloadedFileAsync(
@@ -45,7 +61,9 @@ class Program
     private static async Task<List<MovePlan>> ScanFromDesktopAsync(
         string[] foldersToScan,
         int scanLimit,
-        IEnumerable<string>? specificFiles)
+        IEnumerable<string>? specificFiles,
+        string? databasePath = null,
+        Uri? ollamaEndpoint = null)
     {
         string homePath = Environment.GetFolderPath(
             Environment.SpecialFolder.UserProfile);
@@ -63,11 +81,7 @@ class Program
             ".dmg", ".pkg", ".xlsx", ".xls", ".csv", ".ppt", ".pptx"
         };
 
-        var ollama = new OllamaApiClient(
-            new Uri("http://localhost:11434"),
-            OllamaModel);
-
-        InitializeDatabase();
+        InitializeDatabase(databasePath);
 
         return await ScanFiles(
             foldersToScan,
@@ -75,9 +89,10 @@ class Program
             projectPath,
             duplicateReviewPath,
             supportedExtensions,
-            ollama,
             scanLimit,
-            specificFiles);
+            specificFiles,
+            databasePath,
+            ollamaEndpoint);
     }
 
     internal static OrganizationResult OrganizeFromDesktop(
@@ -427,10 +442,6 @@ class Program
                 ".pptx"
             };
 
-        var ollama = new OllamaApiClient(
-            new Uri("http://localhost:11434"),
-            OllamaModel
-        );
         InitializeDatabase();
 
         List<MovePlan> movePlans = new();
@@ -480,7 +491,6 @@ class Program
                     projectPath,
                     duplicateReviewPath,
                     supportedExtensions,
-                    ollama,
                     scanLimit
                 );
 
@@ -675,9 +685,10 @@ class Program
     string projectPath,
     string duplicateReviewPath,
     HashSet<string> supportedExtensions,
-    OllamaApiClient ollama,
     int scanLimit,
-    IEnumerable<string>? specificFiles = null)
+    IEnumerable<string>? specificFiles = null,
+    string? databasePath = null,
+    Uri? ollamaEndpoint = null)
     {
         List<string> files =
             new();
@@ -775,7 +786,7 @@ class Program
                     else
                     {
                         Classification? cachedClassification =
-                            TryGetCachedClassification(file);
+                            TryGetCachedClassification(file, databasePath);
 
                         if (cachedClassification != null &&
                             !IsUncategorized(cachedClassification))
@@ -785,14 +796,21 @@ class Program
                         }
                         else
                         {
-                            classification = await ClassifyDocumentWithAI(
-                                file,
-                                fileName,
-                                ollama
-                            );
-
-                            SaveClassificationCache(file, classification);
-                            method = "Local AI";
+                            try
+                            {
+                                classification = await ClassifyDocumentWithAI(
+                                    file,
+                                    fileName,
+                                    ollamaEndpoint ?? DefaultOllamaEndpoint);
+                                SaveClassificationCache(file, classification, databasePath);
+                                method = "Local AI";
+                            }
+                            catch (Exception ex)
+                            {
+                                Console.WriteLine($"Local AI unavailable: {ex.Message}");
+                                classification = ClassifyByFileContext(file, fileName, extension);
+                                method = "Filename/context fallback";
+                            }
                         }
                     }
                 }
@@ -1677,7 +1695,7 @@ class Program
         ClassifyDocumentWithAI(
             string file,
             string fileName,
-            OllamaApiClient ollama)
+            Uri ollamaEndpoint)
     {
         string content =
             ExtractText(file);
@@ -1713,49 +1731,71 @@ class Program
             Finance|Taxes, Finance|Other Finance, Personal|Personal Documents,
             Personal|Letters, Personal|Other Personal, Other|Uncategorized.
 
-            Reply with only Category|Subcategory. Do not explain your choice.
+            Return a JSON object with one "classification" value from that list.
+            Use the content as well as the filename. Choose Career|Resumes only for
+            a CV or resume; general work or project notes are Career|Professional.
+            If there is no clear match, choose Other|Uncategorized. Do not explain.
 
             Filename: {fileName}
             Content: {content}
             """;
 
-        StringBuilder aiResponse =
-            new();
-
         using CancellationTokenSource timeout =
             new(AiTimeout);
 
-        GenerateRequest request =
-            new()
-            {
-                Model = OllamaModel,
-                Prompt = prompt,
-                Think = false,
-                Options = new RequestOptions
-                {
-                    NumPredict = 16,
-                    Temperature = 0
-                }
-            };
-
-        await foreach (
-            var response in
-            ollama.GenerateAsync(request, timeout.Token)
-        )
+        string[] allowedClassifications =
         {
-            if (
-                response?.Response != null
-            )
-            {
-                aiResponse.Append(
-                    response.Response
-                );
-            }
-        }
+            "Career|Resumes", "Career|Job Descriptions", "Career|Interviews",
+            "Career|Employment", "Career|Professional", "Education|Assignments",
+            "Education|Research", "Education|Academic Articles", "Education|Admissions",
+            "Education|Certificates", "Education|Course Materials",
+            "Finance|Bank Statements", "Finance|Bills", "Finance|Receipts",
+            "Finance|Taxes", "Finance|Other Finance", "Personal|Personal Documents",
+            "Personal|Letters", "Personal|Other Personal", "Other|Uncategorized"
+        };
 
-        return ParseAIClassification(
-            aiResponse.ToString()
-        );
+        object request = new
+        {
+            model = OllamaModel,
+            prompt,
+            stream = false,
+            think = false,
+            format = new
+            {
+                type = "object",
+                properties = new
+                {
+                    classification = new { type = "string", @enum = allowedClassifications }
+                },
+                required = new[] { "classification" }
+            },
+            options = new { num_predict = 64, temperature = 0 }
+        };
+
+        using HttpClient client = new(new HttpClientHandler { AllowAutoRedirect = false })
+        {
+            BaseAddress = ollamaEndpoint,
+            Timeout = AiTimeout
+        };
+        using HttpResponseMessage response = await client.PostAsJsonAsync(
+            "/api/generate", request, timeout.Token);
+        response.EnsureSuccessStatusCode();
+
+        using JsonDocument payload = await JsonDocument.ParseAsync(
+            await response.Content.ReadAsStreamAsync(timeout.Token),
+            cancellationToken: timeout.Token);
+        string? modelOutput = payload.RootElement.GetProperty("response").GetString();
+        if (string.IsNullOrWhiteSpace(modelOutput))
+            throw new JsonException("Ollama returned an empty classification.");
+
+        using JsonDocument classificationJson = JsonDocument.Parse(modelOutput);
+        string? value = classificationJson.RootElement
+            .GetProperty("classification")
+            .GetString();
+        if (string.IsNullOrWhiteSpace(value) || !allowedClassifications.Contains(value))
+            throw new JsonException("Ollama returned an unsupported category.");
+
+        return ParseAIClassification(value);
     }
 
     static Classification
@@ -2671,7 +2711,9 @@ if (isPersonalDocument)
         cacheCommand.ExecuteNonQuery();
     }
 
-    static Classification? TryGetCachedClassification(string filePath)
+    static Classification? TryGetCachedClassification(
+        string filePath,
+        string? databasePath = null)
     {
         try
         {
@@ -2683,7 +2725,7 @@ if (isPersonalDocument)
             }
 
             using SqliteConnection connection =
-                new($"Data Source={GetDatabasePath()}");
+                new($"Data Source={databasePath ?? GetDatabasePath()}");
 
             connection.Open();
 
@@ -2719,12 +2761,13 @@ if (isPersonalDocument)
 
     static void SaveClassificationCache(
         string filePath,
-        Classification classification)
+        Classification classification,
+        string? databasePath = null)
     {
         FileInfo fileInfo = new(filePath);
 
         using SqliteConnection connection =
-            new($"Data Source={GetDatabasePath()}");
+            new($"Data Source={databasePath ?? GetDatabasePath()}");
 
         connection.Open();
 

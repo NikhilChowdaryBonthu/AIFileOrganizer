@@ -1,18 +1,41 @@
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using Avalonia;
+using Avalonia.Headless;
+using AIFileOrganizer.Desktop;
+using Microsoft.Data.Sqlite;
 
 internal static class TestRunner
 {
 private static int failed;
 
-private static int Main()
+private static int Main(string[] args)
 {
+    if (args.Length == 3 && args[0] == "--capture-demo")
+    {
+        App.DemoCapture = (args[1], args[2]);
+        AppBuilder.Configure<App>()
+            .UseHeadless(new AvaloniaHeadlessPlatformOptions { UseHeadlessDrawing = false })
+            .UseSkia()
+            .WithInterFont()
+            .StartWithClassicDesktopLifetime(Array.Empty<string>());
+        return Environment.ExitCode;
+    }
+
+    if (args.Contains("--ai-smoke", StringComparer.OrdinalIgnoreCase))
+    {
+        Run("local Ollama text-file scan", TestAiSmoke);
+        return failed == 0 ? 0 : 1;
+    }
+
     Run("move and Undo", TestMoveAndUndo);
     Run("versioned filename conflict", TestVersionedConflict);
     Run("duplicate detection and review", TestDuplicates);
     Run("Undo preserves occupied original path", TestUndoConflict);
     Run("deletion requires confirmation", TestDeletionConfirmation);
+    Run("text scan survives Ollama outage", TestAiFallback);
     return failed == 0 ? 0 : 1;
 }
 
@@ -102,6 +125,39 @@ private static void TestDeletionConfirmation()
     Check(rejected && File.Exists(selected), "Deletion without confirmation must leave the file untouched.");
     Check(Program.DeleteSelectedFiles(new[] { plan }, true) == 1, "Confirmed deletion should report one file.");
     Check(!File.Exists(selected) && File.Exists(unselected), "Only the selected disposable file may be deleted.");
+}
+
+private static void TestAiFallback()
+{
+    using Fixture fixture = new();
+    string source = fixture.File("incoming/unlabeled_document.txt", "Synthetic meeting notes for testing.");
+    var plans = Program.ScanFromDesktopAsync(
+        new[] { fixture.PathFor("incoming") },
+        1,
+        fixture.Database,
+        new Uri("http://127.0.0.1:1")).GetAwaiter().GetResult();
+    Check(plans.Count == 1 && plans[0].Source == source,
+        "A local-AI connection failure must not hide the file from review.");
+}
+
+private static void TestAiSmoke()
+{
+    using Fixture fixture = new();
+    fixture.File("incoming/unlabeled_document_a.txt", "Synthetic project meeting notes about a new feature.");
+    fixture.File("incoming/unlabeled_document_b.txt", "Synthetic personal letter about a family visit.");
+    Stopwatch stopwatch = Stopwatch.StartNew();
+    var plans = Program.ScanFromDesktopAsync(
+        new[] { fixture.PathFor("incoming") },
+        2,
+        fixture.Database,
+        new Uri("http://localhost:11434")).GetAwaiter().GetResult();
+    Check(plans.Count == 2, "Both text files should remain visible after classification.");
+    Check(stopwatch.Elapsed < TimeSpan.FromSeconds(45), "The two-file scan took too long.");
+    using SqliteConnection connection = new($"Data Source={fixture.Database}");
+    connection.Open();
+    using SqliteCommand command = new("SELECT COUNT(*) FROM ClassificationCache;", connection);
+    Check(Convert.ToInt32(command.ExecuteScalar()) == 2,
+        "Both files should receive structured local-AI classifications.");
 }
 
 private static MovePlan Plan(string source, string destination) => new(source, destination, "Tests", "Sample");

@@ -17,7 +17,6 @@
     <PackageReference Include="Avalonia.Fonts.Inter" Version="12.1.2" />
     <PackageReference Include="DocumentFormat.OpenXml" Version="3.5.1" />
     <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.12" />
-    <PackageReference Include="OllamaSharp" Version="5.4.30" />
     <PackageReference Include="PdfPig" Version="0.1.17-alpha-202609071845-0d1d6" />
   </ItemGroup>
 

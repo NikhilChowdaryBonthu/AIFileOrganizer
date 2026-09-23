@@ -6,21 +6,22 @@ AI File Organizer is a local Mac desktop assistant for reviewing and organizing 
 
 The app is designed for review first: it scans files, shows a suggested destination for every item, and waits for the user to choose which files to move.
 
-![Illustrative AI File Organizer desktop preview](docs/desktop-preview.svg)
+![AI File Organizer showing a safe scan of sample CSV files](docs/desktop-screenshot.png)
 
-This diagram uses example data only; it is not a screenshot of the running app.
+Actual Avalonia app interface rendered with synthetic sample CSV files. No personal files appear in the image, and no files were moved for the screenshot.
 
 ## Download and install on Mac
 
-Download [AI File Organizer v2.1.0 for Apple Silicon](https://github.com/NikhilChowdaryBonthu/AIFileOrganizer/releases/download/v2.1.0/AIFileOrganizer-v2.1.0-macos-arm64.zip). Unzip it, move **AI File Organizer.app** to Applications, and open it. The bundle includes the .NET runtime; it still needs [Ollama](https://ollama.com/) running locally with `qwen3:4b` (see Requirements below).
+Download [AI File Organizer v2.1.1 for Apple Silicon](https://github.com/NikhilChowdaryBonthu/AIFileOrganizer/releases/download/v2.1.1/AIFileOrganizer-v2.1.1-macos-arm64.zip). Unzip it, move **AI File Organizer.app** to Applications, and open it. The bundle includes the .NET runtime; it still needs [Ollama](https://ollama.com/) running locally with `qwen3:4b` for AI classification (see Requirements below).
 
-The app is ad-hoc signed, not Apple notarized. macOS may display an unidentified-developer warning. Review the [release page](https://github.com/NikhilChowdaryBonthu/AIFileOrganizer/releases/tag/v2.1.0) before opening it; use macOS's Open action only if you trust this project. No account or paid service is needed.
+The app is ad-hoc signed, not Apple notarized. macOS may display an unidentified-developer warning. Review the [release page](https://github.com/NikhilChowdaryBonthu/AIFileOrganizer/releases/tag/v2.1.1) before opening it; use macOS's Open action only if you trust this project. No account or paid service is needed.
 
 ## What the app does
 
 - Scan Downloads, Desktop, Documents, or one custom folder. Selecting a custom folder scans only that folder.
 - Enter any scan size from 1 to 1000 files.
 - Classify supported files using filename rules, folder context, and local Ollama when needed.
+- Keep files visible for review with a filename/context fallback if Ollama is offline or times out.
 - Show the full destination path before a file is moved.
 - Let the user tick or untick each scanned file.
 - Move selected files into the default organized structure, a newly created Documents folder, or any existing folder selected in the app.
@@ -82,6 +83,12 @@ dotnet run --project tests/AIFileOrganizer.Tests/AIFileOrganizer.Tests.csproj --
 
 The tests create isolated temporary files and a separate SQLite history database. They cover moves, filename conflicts, exact duplicates, Undo, and the permanent-deletion confirmation. They do not scan your personal folders.
 
+With Ollama running, an optional live check scans two synthetic text files into an isolated test database:
+
+```bash
+dotnet run --project tests/AIFileOrganizer.Tests/AIFileOrganizer.Tests.csproj --configuration Release -- --ai-smoke
+```
+
 ## Build the standalone Mac app
 
 Create the app bundle with:
@@ -108,4 +115,4 @@ This creates `dist/AI File Organizer.app` and verifies its ad-hoc code signature
 
 ## Current status
 
-Version 2.1 is a local desktop organizer with manual review, custom source and destination folders, duplicate detection, Undo, optional Downloads watching, and standalone Mac app packaging. The app is not Apple notarized.
+Version 2.1.1 is a local desktop organizer with manual review, custom source and destination folders, duplicate detection, Undo, optional Downloads watching, and standalone Mac app packaging. Text-file classification uses bounded local Ollama requests with structured output and a safe fallback. The app is not Apple notarized.
